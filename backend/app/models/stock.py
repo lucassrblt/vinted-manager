@@ -1,0 +1,108 @@
+from datetime import date, datetime
+from decimal import Decimal
+from typing import Any
+
+from sqlalchemy import JSON, CheckConstraint, ForeignKey, Numeric, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.db import Base, TimestampMixin, utcnow
+from app.models.enums import StatutArticle
+
+Money = Numeric(10, 2)
+
+
+class Batch(TimestampMixin, Base):
+    __tablename__ = "batch"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nom: Mapped[str] = mapped_column(String(120), unique=True)
+    fournisseur: Mapped[str | None] = mapped_column(String(120))
+    date_commande: Mapped[date | None]
+    total_paye: Mapped[Decimal | None] = mapped_column(Money)
+    remise_globale: Mapped[Decimal] = mapped_column(Money, default=Decimal("0"))
+    notes: Mapped[str | None] = mapped_column(Text)
+
+    articles: Mapped[list["Article"]] = relationship(back_populates="batch")
+
+
+class Article(TimestampMixin, Base):
+    __tablename__ = "article"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nom: Mapped[str] = mapped_column(String(255))
+    marque: Mapped[str | None] = mapped_column(String(120), index=True)
+    categorie: Mapped[str | None] = mapped_column(String(120), index=True)
+    taille: Mapped[str | None] = mapped_column(String(40))
+    couleur: Mapped[str | None] = mapped_column(String(80))
+    etat: Mapped[str | None] = mapped_column(String(40))
+    prix_achat_brut: Mapped[Decimal | None] = mapped_column(Money)
+    remise: Mapped[Decimal] = mapped_column(Money, default=Decimal("0"))
+    prix_achat_net: Mapped[Decimal | None] = mapped_column(Money)
+    prix_vente_cible: Mapped[Decimal | None] = mapped_column(Money)
+    prix_vente_reel: Mapped[Decimal | None] = mapped_column(Money)
+    statut: Mapped[str] = mapped_column(String(30), default=StatutArticle.RECU_A_PUBLIER, index=True)
+    batch_id: Mapped[int | None] = mapped_column(ForeignKey("batch.id", ondelete="SET NULL"), index=True)
+    source: Mapped[str | None] = mapped_column(String(120))
+    date_achat: Mapped[date | None]
+    date_reception: Mapped[datetime | None]
+    date_publication: Mapped[datetime | None]
+    date_vente: Mapped[datetime | None]
+    date_envoi: Mapped[datetime | None]
+    date_livraison: Mapped[datetime | None]
+    litige: Mapped[bool] = mapped_column(default=False)
+    notes: Mapped[str | None] = mapped_column(Text)
+    titre_annonce: Mapped[str | None] = mapped_column(String(120))
+    description_annonce: Mapped[str | None] = mapped_column(Text)
+    mesures: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)
+
+    batch: Mapped[Batch | None] = relationship(back_populates="articles")
+    historique: Mapped[list["HistoriqueStatut"]] = relationship(
+        back_populates="article", cascade="all, delete-orphan", order_by="HistoriqueStatut.date"
+    )
+
+
+class HistoriqueStatut(Base):
+    __tablename__ = "historique_statut"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    article_id: Mapped[int] = mapped_column(ForeignKey("article.id", ondelete="CASCADE"), index=True)
+    ancien_statut: Mapped[str | None] = mapped_column(String(30))
+    nouveau_statut: Mapped[str] = mapped_column(String(30))
+    date: Mapped[datetime] = mapped_column(default=utcnow)
+    commentaire: Mapped[str | None] = mapped_column(String(255))
+
+    article: Mapped[Article] = relationship(back_populates="historique")
+
+
+class PreuveAchat(Base):
+    __tablename__ = "preuve_achat"
+    __table_args__ = (CheckConstraint("article_id IS NOT NULL OR batch_id IS NOT NULL", name="preuve_cible"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    article_id: Mapped[int | None] = mapped_column(ForeignKey("article.id", ondelete="CASCADE"), index=True)
+    batch_id: Mapped[int | None] = mapped_column(ForeignKey("batch.id", ondelete="CASCADE"), index=True)
+    type: Mapped[str] = mapped_column(String(30))
+    fichier: Mapped[str] = mapped_column(String(500))
+    nom_original: Mapped[str] = mapped_column(String(255))
+    mime: Mapped[str] = mapped_column(String(100))
+    taille_octets: Mapped[int]
+    date_upload: Mapped[datetime] = mapped_column(default=utcnow)
+    note: Mapped[str | None] = mapped_column(String(500))
+
+
+class PisteSourcing(TimestampMixin, Base):
+    __tablename__ = "piste_sourcing"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    origine: Mapped[str] = mapped_column(String(30), default="manuel")  # tests / recherche / manuel
+    marque: Mapped[str | None] = mapped_column(String(120))
+    produit: Mapped[str] = mapped_column(String(255))
+    mots_cles: Mapped[str | None] = mapped_column(Text)
+    categorie: Mapped[str | None] = mapped_column(String(120))
+    achat_max: Mapped[Decimal | None] = mapped_column(Money)
+    revente_basse: Mapped[Decimal | None] = mapped_column(Money)
+    revente_haute: Mapped[Decimal | None] = mapped_column(Money)
+    priorite: Mapped[str | None] = mapped_column(String(30))
+    quantite_test: Mapped[str | None] = mapped_column(String(30))
+    commentaire: Mapped[str | None] = mapped_column(Text)
