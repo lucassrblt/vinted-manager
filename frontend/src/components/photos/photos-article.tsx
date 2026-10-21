@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { ComparaisonModeles } from "@/components/photos/comparaison-modeles";
 import { Button } from "@/components/ui/button";
 import { api, telecharger } from "@/lib/api";
+import { reduirePhoto } from "@/lib/images";
 import { cn } from "@/lib/utils";
 
 export type TypePhoto = "devant" | "dos" | "etiquette" | "logo" | "detail" | "defaut";
@@ -226,7 +227,7 @@ export function PhotosArticle({ articleId }: { articleId: number }) {
     mutationFn: async (lots: { fichier: File; type: TypePhoto }[]) => {
       for (const { fichier, type } of lots) {
         const form = new FormData();
-        form.append("fichier", fichier);
+        form.append("fichier", await reduirePhoto(fichier));
         form.append("type", type);
         await api(`/articles/${articleId}/photos`, { form });
       }

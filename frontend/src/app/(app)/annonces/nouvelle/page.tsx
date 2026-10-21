@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { EnTetePage } from "@/components/commun";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
+import { reduirePhoto } from "@/lib/images";
 import { useInvaliderStock } from "@/lib/queries";
 import { cn } from "@/lib/utils";
 
@@ -23,9 +24,9 @@ export default function NouvelleAnnonce() {
   useEffect(() => () => apercus.forEach((u) => URL.revokeObjectURL(u)), [apercus]);
 
   const creation = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const form = new FormData();
-      for (const f of fichiers) form.append("photos", f);
+      for (const f of await Promise.all(fichiers.map(reduirePhoto))) form.append("photos", f);
       return api<{ article_id: number; erreur_ia: string | null; retouche_lancee: boolean }>("/annonces/nouvelle", {
         form,
       });
