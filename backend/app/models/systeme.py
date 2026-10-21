@@ -87,7 +87,9 @@ class Parametres(Base):
     imap_dossier: Mapped[str] = mapped_column(String(255), default="INBOX")
     expediteurs_vinted: Mapped[list[str]] = mapped_column(JSON, default=lambda: ["vinted.fr", "vinted.com"])
     derniere_synchro: Mapped[datetime | None]
-    # Photos IA : modèle Replicate et photo du fond (tapis) servant de référence
+    # Photos IA : modèle par type de photo (None = choix par défaut du code), modèle « haute qualité »
+    # utilisé par le bouton de régénération premium, et photo du fond (tapis) servant de référence.
+    modeles_photos: Mapped[dict[str, str] | None] = mapped_column(JSON)
     modele_photos: Mapped[str] = mapped_column(String(120), default="google/nano-banana-2")
     photo_fond: Mapped[str | None] = mapped_column(String(500))
     notifications: Mapped[dict[str, Any]] = mapped_column(

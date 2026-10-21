@@ -158,7 +158,16 @@
 | FLUX.2 [dev] | ~0,02 $ | Fond inventé (moquette, fenêtre) : écarté |
 | Qwen Edit Plus | ~0,03 $ | Mur et parquet ajoutés, vue de biais : écarté |
 
-Coût estimé : **~0,27 $ par article** (4 photos), ~0,40 $ avec des régénérations, soit 27 à 40 $ pour 100 articles.
+**Mise à jour : modèle par type de photo.** GPT Image 2 en qualité basse, testé ensuite sur tes photos, est aussi fidèle que Nano Banana 2 sur les vues entières, l'étiquette et le logo. Il est utilisé par défaut pour tous les types. Le bouton **HQ** d'une photo la régénère avec Nano Banana 2 quand elle ne convient pas. Les deux réglages sont modifiables type par type dans Paramètres → Photos.
+
+| Modèle (essai du 21/10) | Prix / photo | Résultat |
+|---|---|---|
+| **GPT Image 2, qualité basse** | ~0,012 $ | **Fidèle partout** : vêtement, logo, étiquette (« MADE IN PAKISTAN »), tapis |
+| GPT Image 2, qualité moyenne | ~0,047 $ | À peine mieux que la qualité basse sur l'étiquette |
+| Nano Banana 1 | ~0,039 $ | Correct, mais tache de lumière artificielle |
+| FLUX.2 klein | ~0,002 $ | **A inventé une fermeture éclair** et une fenêtre : écarté |
+
+Coût estimé : **~0,05 $ par article** (4 photos), soit ~5 $ pour 100 articles, régénérations HQ occasionnelles en plus. Replicate facture GPT Image 2 par image produite selon la qualité (métriques « model_variant: low ») : vérifie le montant réel sur ta facture Replicate après quelques jours.
 
 ### Points de vigilance
 - Les tout petits textes d'étiquette (tableau des tailles) peuvent être approximatifs : **toujours comparer avec l'original avant de publier**.

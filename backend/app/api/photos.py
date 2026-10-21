@@ -159,11 +159,13 @@ def _verifier_config(db: Db) -> None:
         raise HTTPException(409, "Ajoute d'abord la photo de ton tapis dans Paramètres → Photos.")
 
 
-def _lancer(db: Db, taches: BackgroundTasks, liste: list[PhotoArticle]) -> list[PhotoOut]:
+def _lancer(
+    db: Db, taches: BackgroundTasks, liste: list[PhotoArticle], premium: bool = False
+) -> list[PhotoOut]:
     for p in liste:
         p.statut, p.erreur = "en_cours", None
     db.commit()
-    taches.add_task(photos.tache_generation, [p.id for p in liste])
+    taches.add_task(photos.tache_generation, [p.id for p in liste], premium)
     return [_out(p) for p in liste]
 
 
@@ -184,14 +186,15 @@ def generer(article_id: int, db: Db, taches: BackgroundTasks, tout: bool = False
 
 
 @router.post("/photos/{photo_id}/regenerer", response_model=PhotoOut)
-def regenerer(photo_id: int, db: Db, taches: BackgroundTasks) -> PhotoOut:
+def regenerer(photo_id: int, db: Db, taches: BackgroundTasks, premium: bool = False) -> PhotoOut:
+    """Nouvelle version de la photo ; `premium=true` utilise le modèle haute qualité (plus cher)."""
     p = _photo(db, photo_id)
     if p.type == "defaut":
         raise HTTPException(409, "Une photo de défaut n'est jamais retouchée.")
     if p.statut == "en_cours":
         raise HTTPException(409, "Génération déjà en cours pour cette photo.")
     _verifier_config(db)
-    return _lancer(db, taches, [p])[0]
+    return _lancer(db, taches, [p], premium)[0]
 
 
 @router.get("/photos/{photo_id}/fichier")
@@ -234,10 +237,12 @@ def zip_photos(article_id: int, db: Db) -> StreamingResponse:
 
 
 class ParametresPhotos(BaseModel):
-    modele: str
+    modele: str  # modèle « haute qualité » (bouton de régénération premium)
+    modeles_par_type: dict[str, str]
     fond_defini: bool
     configure: bool
     modeles: dict[str, float]
+    cout_article: float  # estimation pour devant + dos + étiquette + logo
     depense_mois: Decimal
     photos_generees_mois: int
 
@@ -249,25 +254,38 @@ def lire_parametres(db: Db) -> ParametresPhotos:
     lignes = db.scalars(
         select(PhotoArticle).where(PhotoArticle.updated_at >= debut_mois, PhotoArticle.nb_generations > 0)
     ).all()
+    par_type = {t: photos.modele_pour(p, t) for t in photos.TYPES_RETOUCHES}
     return ParametresPhotos(
         modele=p.modele_photos,
+        modeles_par_type=par_type,
         fond_defini=bool(p.photo_fond),
         configure=bool(get_settings().replicate_api_token),
         modeles=replicate_client.PRIX_PAR_IMAGE,
+        cout_article=round(
+            sum(replicate_client.PRIX_PAR_IMAGE.get(par_type[t], 0.07) for t in photos.TYPES_OBLIGATOIRES), 3
+        ),
         depense_mois=sum((x.cout_estime for x in lignes), Decimal("0")),
         photos_generees_mois=sum(x.nb_generations for x in lignes),
     )
 
 
 class ModifParametresPhotos(BaseModel):
-    modele: str
+    modele: str | None = None
+    modeles_par_type: dict[str, str] | None = None
 
 
 @router.put("/parametres/photos", response_model=ParametresPhotos)
 def modifier_parametres(data: ModifParametresPhotos, db: Db) -> ParametresPhotos:
-    if data.modele not in replicate_client.PRIX_PAR_IMAGE:
-        raise HTTPException(422, "Modèle non pris en charge.")
-    get_parametres(db).modele_photos = data.modele
+    p = get_parametres(db)
+    if data.modele is not None:
+        if data.modele not in replicate_client.PRIX_PAR_IMAGE:
+            raise HTTPException(422, "Modèle non pris en charge.")
+        p.modele_photos = data.modele
+    if data.modeles_par_type is not None:
+        for type_photo, modele in data.modeles_par_type.items():
+            if type_photo not in photos.TYPES_RETOUCHES or modele not in replicate_client.PRIX_PAR_IMAGE:
+                raise HTTPException(422, f"Choix invalide pour « {type_photo} ».")
+        p.modeles_photos = {**(p.modeles_photos or {}), **data.modeles_par_type}
     db.commit()
     return lire_parametres(db)
 

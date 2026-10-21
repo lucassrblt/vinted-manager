@@ -124,6 +124,17 @@ function CartePhoto({ photo, onChange }: { photo: PhotoArticle; onChange: () => 
             >
               <RefreshCw />
             </Button>
+            {photo.a_version_generee && (
+              <Button
+                variant="ghost"
+                size="xs"
+                title="Régénérer avec le modèle haute qualité (~0,07 $), si la photo ne convient pas"
+                disabled={enCours || action.isPending}
+                onClick={() => action.mutate({ methode: "POST", chemin: `/photos/${photo.id}/regenerer?premium=true` })}
+              >
+                <Sparkles /> HQ
+              </Button>
+            )}
           </div>
         )}
         <div className="flex items-center justify-between text-[11px] text-muted-foreground">
@@ -202,10 +213,7 @@ export function PhotosArticle({ articleId }: { articleId: number }) {
   });
   const config = useQuery({
     queryKey: ["parametres", "photos"],
-    queryFn: () =>
-      api<{ fond_defini: boolean; configure: boolean; modele: string; modeles: Record<string, number> }>(
-        "/parametres/photos",
-      ),
+    queryFn: () => api<{ fond_defini: boolean; configure: boolean; cout_article: number }>("/parametres/photos"),
     staleTime: 60_000,
   });
   const rafraichir = () => qc.invalidateQueries({ queryKey: cle });
@@ -242,7 +250,8 @@ export function PhotosArticle({ articleId }: { articleId: number }) {
   const aGenerer = photos.filter(
     (p) => p.type !== "defaut" && (p.statut === "a_generer" || p.statut === "erreur"),
   ).length;
-  const prix = config.data ? (config.data.modeles[config.data.modele] ?? 0.07) : 0.067;
+  // Coût moyen par photo avec les modèles choisis pour chaque type
+  const prix = config.data ? config.data.cout_article / 4 : 0.012;
 
   // Dépôt groupé : les photos remplissent d'abord les emplacements vides (devant, dos, étiquette, logo).
   function deposerEnVrac(fichiers: File[]) {

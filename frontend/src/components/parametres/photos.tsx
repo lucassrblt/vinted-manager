@@ -12,6 +12,8 @@ import { cn } from "@/lib/utils";
 
 interface ParametresPhotos {
   modele: string;
+  modeles_par_type: Record<string, string>;
+  cout_article: number;
   fond_defini: boolean;
   configure: boolean;
   modeles: Record<string, number>;
@@ -20,11 +22,21 @@ interface ParametresPhotos {
 }
 
 const NOMS: Record<string, string> = {
-  "google/nano-banana-2": "Nano Banana 2 — le plus fidèle (recommandé)",
+  "openai/gpt-image-2:low": "GPT Image 2, qualité basse — fidèle et très économique (recommandé)",
+  "openai/gpt-image-2:medium": "GPT Image 2, qualité moyenne",
+  "google/nano-banana-2": "Nano Banana 2 — le plus fidèle, plus cher",
   "bytedance/seedream-5-lite": "Seedream 5 Lite — moins cher, textes d'étiquette moins fiables",
   "bytedance/seedream-4.5": "Seedream 4.5",
   "black-forest-labs/flux-2-pro": "FLUX.2 Pro",
   "qwen/qwen-image-edit-plus": "Qwen Image Edit Plus",
+};
+
+const LIBELLES_TYPES: Record<string, string> = {
+  devant: "Devant",
+  dos: "Dos",
+  etiquette: "Étiquette",
+  logo: "Logo",
+  detail: "Détail",
 };
 
 export function ParametresPhotosIa() {
@@ -35,7 +47,8 @@ export function ParametresPhotosIa() {
   });
   const maj = (r: ParametresPhotos) => qc.setQueryData(["parametres", "photos"], r);
   const modele = useMutation({
-    mutationFn: (m: string) => api<ParametresPhotos>("/parametres/photos", { method: "PUT", body: { modele: m } }),
+    mutationFn: (corps: { modele?: string; modeles_par_type?: Record<string, string> }) =>
+      api<ParametresPhotos>("/parametres/photos", { method: "PUT", body: corps }),
     onSuccess: (r) => {
       maj(r);
       toast.success("Modèle enregistré");
@@ -61,7 +74,6 @@ export function ParametresPhotosIa() {
   });
 
   if (!data) return <LignesSquelette n={4} />;
-  const prix = data.modeles[data.modele] ?? 0;
 
   return (
     <div className="grid max-w-5xl gap-5 lg:grid-cols-[1fr_320px]">
@@ -71,25 +83,52 @@ export function ParametresPhotosIa() {
             Ajoute REPLICATE_API_TOKEN aux variables du serveur pour activer la retouche des photos.
           </p>
         )}
+        <div className="space-y-3">
+          <div>
+            <p className="text-sm font-medium">Modèle selon le type de photo</p>
+            <p className="text-xs text-muted-foreground">
+              Environ {data.cout_article.toLocaleString("fr-FR", { maximumFractionDigits: 3 })} $ par article (devant,
+              dos, étiquette, logo).
+            </p>
+          </div>
+          {Object.entries(data.modeles_par_type).map(([type, m]) => (
+            <div key={type} className="grid items-center gap-1 sm:grid-cols-[110px_1fr] sm:gap-3">
+              <label htmlFor={`modele-${type}`} className="text-sm text-muted-foreground">
+                {LIBELLES_TYPES[type] ?? type}
+              </label>
+              <Select value={m} onValueChange={(v) => modele.mutate({ modeles_par_type: { [type]: v } })}>
+                <SelectTrigger id={`modele-${type}`} className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(data.modeles).map(([id, p]) => (
+                    <SelectItem key={id} value={id}>
+                      {NOMS[id] ?? id} · ~{p.toLocaleString("fr-FR")} $
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ))}
+        </div>
+
         <div className="space-y-1.5">
-          <label htmlFor="modele-photos" className="text-sm font-medium">
-            Modèle de retouche
+          <label htmlFor="modele-premium" className="text-sm font-medium">
+            Modèle « haute qualité » (bouton HQ sur une photo)
           </label>
-          <Select value={data.modele} onValueChange={(m) => modele.mutate(m)}>
-            <SelectTrigger id="modele-photos" className="w-full">
+          <Select value={data.modele} onValueChange={(m) => modele.mutate({ modele: m })}>
+            <SelectTrigger id="modele-premium" className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {Object.entries(data.modeles).map(([m, p]) => (
-                <SelectItem key={m} value={m}>
-                  {NOMS[m] ?? m} · ~{p.toLocaleString("fr-FR")} $ / photo
+              {Object.entries(data.modeles).map(([id, p]) => (
+                <SelectItem key={id} value={id}>
+                  {NOMS[id] ?? id} · ~{p.toLocaleString("fr-FR")} $
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <p className="text-xs text-muted-foreground">
-            Environ {(prix * 4).toLocaleString("fr-FR", { maximumFractionDigits: 2 })} $ par article de 4 photos.
-          </p>
+          <p className="text-xs text-muted-foreground">À utiliser seulement quand une photo ne convient pas.</p>
         </div>
 
         <div className="space-y-2">

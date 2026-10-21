@@ -28,6 +28,21 @@ TYPES = {
 }
 ORDRE_TYPES = list(TYPES)
 TYPES_OBLIGATOIRES = ("devant", "dos", "etiquette", "logo")
+TYPES_RETOUCHES = ("devant", "dos", "etiquette", "logo", "detail")
+
+# Modèle par défaut selon le type : GPT Image 2 en qualité basse, testé fidèle sur les vues entières,
+# les étiquettes et les logos, pour ~0,012 $ la photo. Le bouton « haute qualité » passe par
+# Parametres.modele_photos (Nano Banana 2 par défaut).
+MODELES_PAR_DEFAUT = {t: "openai/gpt-image-2:low" for t in TYPES_RETOUCHES}
+
+
+def modele_pour(params: Parametres, type_photo: str, premium: bool = False) -> str:
+    if premium:
+        return params.modele_photos or "google/nano-banana-2"
+    return (params.modeles_photos or {}).get(type_photo) or MODELES_PAR_DEFAUT.get(
+        type_photo, "openai/gpt-image-2:low"
+    )
+
 
 FIDELITE = (
     "Keep the garment strictly identical to image 1: same exact color and shade, same fabric texture, "
@@ -119,7 +134,9 @@ def construire_prompt(type_photo: str, article: Article, dispo: str, reference_c
     )
 
 
-def generer_photo(db: Session, photo: PhotoArticle, params: Parametres, lumiere: str) -> None:
+def generer_photo(
+    db: Session, photo: PhotoArticle, params: Parametres, lumiere: str, premium: bool = False
+) -> None:
     """Génère la version retouchée d'une photo (appel réseau, plusieurs secondes)."""
     if photo.type == "defaut":
         photo.statut, photo.version_choisie = "original", "original"
@@ -148,7 +165,8 @@ def generer_photo(db: Session, photo: PhotoArticle, params: Parametres, lumiere:
         if devant is not None:
             entrees.append(("devant.jpg", storage.chemin_absolu(devant.fichier_original).read_bytes()))
     prompt = construire_prompt(photo.type, article, photo.disposition, reference_couleur=devant is not None)
-    contenu, prediction_id = replicate_client.generer(params.modele_photos, prompt, entrees)
+    modele = modele_pour(params, photo.type, premium)
+    contenu, prediction_id = replicate_client.generer(modele, prompt, entrees)
     ancien = photo.fichier_genere
     photo.fichier_genere = storage.ecrire_fichier(
         f"photos/article-{article.id}", f"{photo.type}-ia.jpg", images.en_jpeg(contenu)
@@ -156,14 +174,14 @@ def generer_photo(db: Session, photo: PhotoArticle, params: Parametres, lumiere:
     if ancien:
         storage.supprimer(ancien)
     photo.prediction_id = prediction_id
-    photo.modele = params.modele_photos
+    photo.modele = modele
     photo.nb_generations += 1
-    photo.cout_estime += Decimal(str(replicate_client.PRIX_PAR_IMAGE.get(params.modele_photos, 0.07)))
+    photo.cout_estime += Decimal(str(replicate_client.PRIX_PAR_IMAGE.get(modele, 0.07)))
     photo.statut, photo.version_choisie, photo.erreur = "genere", "genere", None
     db.commit()
 
 
-def tache_generation(photo_ids: list[int]) -> None:
+def tache_generation(photo_ids: list[int], premium: bool = False) -> None:
     """Tâche de fond : génère les photos une par une (la limite de débit de Replicate est respectée)."""
     lumiere = random.choice(LUMIERES)  # même lumière pour toutes les photos d'un même lot
     with SessionLocal() as db:
@@ -172,7 +190,7 @@ def tache_generation(photo_ids: list[int]) -> None:
             select(PhotoArticle).where(PhotoArticle.id.in_(photo_ids)).order_by(PhotoArticle.ordre)
         ):
             try:
-                generer_photo(db, photo, params, lumiere)
+                generer_photo(db, photo, params, lumiere, premium)
             except replicate_client.ErreurReplicate as exc:
                 db.rollback()
                 photo.statut, photo.erreur = "erreur", str(exc)

@@ -89,6 +89,8 @@ def test_parcours_complet(client: TestClient, db: Session, config: list[dict[str
         "/api/parametres/photos/fond", files={"fichier": ("tapis.jpg", jpeg(couleur="white"), "image/jpeg")}
     )
     assert r.json()["fond_defini"] is True and r.json()["modele"] == "google/nano-banana-2"
+    assert set(r.json()["modeles_par_type"].values()) == {"openai/gpt-image-2:low"}
+    assert r.json()["cout_article"] == 0.048
 
     for t in ("devant", "dos", "etiquette", "logo", "defaut"):
         _deposer(client, a.id, t)
@@ -105,7 +107,8 @@ def test_parcours_complet(client: TestClient, db: Session, config: list[dict[str
     etat = client.get(f"/api/articles/{a.id}/photos").json()
     generees = [p for p in etat["photos"] if p["type"] != "defaut"]
     assert all(p["statut"] == "genere" and p["a_version_generee"] for p in generees)
-    assert D(etat["cout_total"]) == D("0.268")
+    assert D(etat["cout_total"]) == D("0.048")  # 4 × 0,012 $ (GPT Image 2 en qualité basse)
+    assert {c["modele"] for c in config} == {"openai/gpt-image-2:low"}
 
     devant = next(p for p in etat["photos"] if p["type"] == "devant")
     img = Image.open(io.BytesIO(client.get(f"/api/photos/{devant['id']}/fichier").content))
@@ -114,9 +117,11 @@ def test_parcours_complet(client: TestClient, db: Session, config: list[dict[str
     img = Image.open(io.BytesIO(client.get(f"/api/photos/{devant['id']}/fichier").content))
     assert img.getpixel((10, 10))[0] < 200  # retour à l'original (gris)
 
-    r = client.post(f"/api/photos/{devant['id']}/regenerer")
+    r = client.post(f"/api/photos/{devant['id']}/regenerer", params={"premium": True})
     assert r.json()["statut"] == "en_cours"
-    assert client.get(f"/api/articles/{a.id}/photos").json()["photos"][0]["nb_generations"] == 2
+    assert config[-1]["modele"] == "google/nano-banana-2"  # régénération haute qualité
+    photo = client.get(f"/api/articles/{a.id}/photos").json()["photos"][0]
+    assert photo["nb_generations"] == 2 and D(photo["cout_estime"]) == D("0.079")
 
     z = zipfile.ZipFile(io.BytesIO(client.get(f"/api/articles/{a.id}/photos.zip").content))
     assert z.namelist() == ["01-devant.jpg", "02-dos.jpg", "03-etiquette.jpg", "04-logo.jpg", "05-defaut.jpg"]
@@ -188,8 +193,21 @@ def test_client_replicate_attend_la_limite_de_debit(monkeypatch: pytest.MonkeyPa
 
 
 def test_parametres_modele(client: TestClient) -> None:
+    r = client.put(
+        "/api/parametres/photos", json={"modeles_par_type": {"etiquette": "google/nano-banana-2"}}
+    ).json()
+    assert r["modeles_par_type"]["etiquette"] == "google/nano-banana-2"
+    assert r["modeles_par_type"]["devant"] == "openai/gpt-image-2:low"
+    assert r["cout_article"] == round(3 * 0.012 + 0.067, 3)
     assert (
         client.put("/api/parametres/photos", json={"modele": "bytedance/seedream-5-lite"}).json()["modele"]
         == "bytedance/seedream-5-lite"
     )
     assert client.put("/api/parametres/photos", json={"modele": "inconnu/x"}).status_code == 422
+    r = client.put("/api/parametres/photos", json={"modeles_par_type": {"defaut": "google/nano-banana-2"}})
+    assert r.status_code == 422
+
+
+def test_entree_gpt_image_2() -> None:
+    e = replicate_client.entree_modele("openai/gpt-image-2:low", "p", ["u1", "u2"])
+    assert e["quality"] == "low" and e["input_images"] == ["u1", "u2"] and e["aspect_ratio"] == "1152x1536"

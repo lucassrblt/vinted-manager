@@ -13,7 +13,10 @@ ATTENTE_MAX = 240  # secondes
 TENTATIVES_429 = 6
 
 # Prix indicatifs par image générée (USD), pour estimer le coût. Vérifiés le 21/10/2026.
+# « modèle:qualité » pour les modèles OpenAI (Replicate facture par image selon la qualité).
 PRIX_PAR_IMAGE = {
+    "openai/gpt-image-2:low": 0.012,
+    "openai/gpt-image-2:medium": 0.047,
     "google/nano-banana-2": 0.067,
     "bytedance/seedream-5-lite": 0.035,
     "bytedance/seedream-4.5": 0.04,
@@ -21,7 +24,11 @@ PRIX_PAR_IMAGE = {
     "qwen/qwen-image-edit-plus": 0.03,
 }
 # Nom du champ des images d'entrée selon le modèle
-CHAMP_IMAGES = {"black-forest-labs/flux-2-pro": "input_images", "qwen/qwen-image-edit-plus": "image"}
+CHAMP_IMAGES = {
+    "black-forest-labs/flux-2-pro": "input_images",
+    "qwen/qwen-image-edit-plus": "image",
+    "openai/gpt-image-2": "input_images",
+}
 
 
 class ErreurReplicate(Exception):
@@ -59,15 +66,24 @@ def envoyer_fichier(client: httpx.Client, nom: str, contenu: bytes) -> str:
     return str(_verifier(r)["urls"]["get"])
 
 
+def decouper(modele: str) -> tuple[str, str | None]:
+    """« openai/gpt-image-2:low » -> (« openai/gpt-image-2 », « low »)."""
+    base, _, qualite = modele.partition(":")
+    return base, qualite or None
+
+
 def entree_modele(modele: str, prompt: str, images: list[str]) -> dict[str, Any]:
+    base, qualite = decouper(modele)
     entree: dict[str, Any] = {
         "prompt": prompt,
-        CHAMP_IMAGES.get(modele, "image_input"): images,
+        CHAMP_IMAGES.get(base, "image_input"): images,
         "aspect_ratio": "3:4",
     }
-    if modele.startswith("google/nano-banana"):
+    if base == "openai/gpt-image-2":
+        entree |= {"quality": qualite or "low", "aspect_ratio": "1152x1536", "output_format": "jpeg"}
+    elif base.startswith("google/nano-banana"):
         entree |= {"resolution": "1K", "output_format": "jpg"}  # 1K : prix de base, suffisant pour Vinted
-    elif modele.startswith("bytedance/seedream"):
+    elif base.startswith("bytedance/seedream"):
         entree |= {"size": "2K", "max_images": 1}
     else:
         entree |= {"output_format": "jpg"}
@@ -80,7 +96,9 @@ def generer(modele: str, prompt: str, images: list[tuple[str, bytes]]) -> tuple[
         urls = [envoyer_fichier(client, nom, contenu) for nom, contenu in images]
         corps = {"input": entree_modele(modele, prompt, urls)}
         for tentative in range(TENTATIVES_429):
-            r = client.post(f"{API}/models/{modele}/predictions", headers=_entetes(), json=corps, timeout=60)
+            r = client.post(
+                f"{API}/models/{decouper(modele)[0]}/predictions", headers=_entetes(), json=corps, timeout=60
+            )
             if r.status_code != 429:
                 break
             # Compte avec peu de crédit : 6 créations par minute, une à la fois.
