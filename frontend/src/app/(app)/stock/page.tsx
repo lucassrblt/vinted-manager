@@ -28,6 +28,7 @@ import {
 } from "@/components/commun";
 import { CelluleEditable } from "@/components/stock/cellule-editable";
 import { DialogArticle } from "@/components/stock/dialog-article";
+import { BadgeCompte } from "@/components/badge-compte";
 import { DialogBatch } from "@/components/stock/dialog-batch";
 import { FiltreMulti } from "@/components/stock/filtre-multi";
 import {
@@ -61,6 +62,7 @@ import {
   useArticles,
   useBatches,
   useChangerStatut,
+  useComptes,
   useModifierArticle,
   useValeursFiltres,
 } from "@/lib/queries";
@@ -135,6 +137,9 @@ function ContenuStock() {
   const { data, isLoading, isFetching, error, refetch } = useArticles(requete);
   const { data: valeurs } = useValeursFiltres();
   const { data: batches } = useBatches();
+  const { data: comptes } = useComptes();
+  const plusieursComptes = (comptes?.length ?? 0) > 1;
+  const nomsComptes = Object.fromEntries((comptes ?? []).map((c) => [c.id, c.nom]));
   const modifier = useModifierArticle();
   const changerStatut = useChangerStatut();
   const action = useActionGroupee();
@@ -142,7 +147,10 @@ function ContenuStock() {
   const articles = data?.items ?? [];
   const nbPages = data ? Math.max(1, Math.ceil(data.total / TAILLE_PAGE)) : 1;
   const filtresActifs =
-    !!q || [filtres.statut, filtres.batch_id, filtres.marque, filtres.categorie, filtres.taille].some((f) => f?.length);
+    !!q ||
+    [filtres.statut, filtres.batch_id, filtres.compte_id, filtres.marque, filtres.categorie, filtres.taille].some(
+      (f) => f?.length,
+    );
 
   function majFiltre<K extends keyof FiltresStock>(cle: K, v: FiltresStock[K]) {
     setFiltres((f) => ({ ...f, [cle]: v, page: 1 }));
@@ -169,7 +177,10 @@ function ContenuStock() {
 
   const toutSelectionne = articles.length > 0 && articles.every((a) => selection.has(a.id));
 
-  function groupe(corps: { action: string; statut?: Statut; batch_id?: number | null }, message: string) {
+  function groupe(
+    corps: { action: string; statut?: Statut; batch_id?: number | null; compte_id?: number | null },
+    message: string,
+  ) {
     action.mutate(
       { ids: [...selection], ...corps },
       {
@@ -228,6 +239,14 @@ function ContenuStock() {
           selection={filtres.batch_id ?? []}
           onChange={(v) => majFiltre("batch_id", v)}
         />
+        {plusieursComptes && (
+          <FiltreMulti
+            titre="Compte"
+            options={(comptes ?? []).map((c) => ({ valeur: c.id, libelle: c.nom }))}
+            selection={filtres.compte_id ?? []}
+            onChange={(v) => majFiltre("compte_id", v)}
+          />
+        )}
         <FiltreMulti
           titre="Marque"
           options={(valeurs?.marques ?? []).map((m) => ({ valeur: m, libelle: m }))}
@@ -305,6 +324,30 @@ function ContenuStock() {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
+            {!!comptes?.length && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline">
+                    Compte Vinted
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem
+                    onClick={() => groupe({ action: "compte", compte_id: null }, "sans compte attribué")}
+                  >
+                    Aucun compte
+                  </DropdownMenuItem>
+                  {comptes.map((c) => (
+                    <DropdownMenuItem
+                      key={c.id}
+                      onClick={() => groupe({ action: "compte", compte_id: c.id }, `attribué(s) à ${c.nom}`)}
+                    >
+                      {c.nom}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
             <Button size="sm" variant="destructive" onClick={() => setConfirmSuppr(true)}>
               <Trash2 /> Supprimer
             </Button>
@@ -342,6 +385,7 @@ function ContenuStock() {
                     <StatutBadge statut={a.statut} />
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground tabular-nums">
+                    {plusieursComptes && a.compte_id && <BadgeCompte nom={nomsComptes[a.compte_id]} />}
                     {a.taille && <span>{a.taille}</span>}
                     <span>Achat {formatEuros(a.prix_achat_net)}</span>
                     <span>Vente {formatEuros(a.prix_vente)}</span>
@@ -410,7 +454,10 @@ function ContenuStock() {
                       >
                         {a.nom}
                       </Link>
-                      {a.marque && <span className="text-xs text-muted-foreground">{a.marque}</span>}
+                      <span className="flex items-center gap-2">
+                        {a.marque && <span className="text-xs text-muted-foreground">{a.marque}</span>}
+                        {plusieursComptes && a.compte_id && <BadgeCompte nom={nomsComptes[a.compte_id]} />}
+                      </span>
                     </TableCell>
                     <TableCell className="w-20">
                       <CelluleEditable libelle="la taille" valeur={a.taille} onSave={(v) => sauver(a, "taille", v)} />

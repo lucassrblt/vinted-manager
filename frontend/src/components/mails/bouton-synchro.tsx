@@ -14,11 +14,13 @@ export function BoutonSynchro() {
   const journal = useQuery({ queryKey: ["imap", "logs"], queryFn: () => api<SyncLog[]>("/imap/logs") });
   const derniere = journal.data?.[0];
   const synchro = useMutation({
-    mutationFn: () => api<SyncLog>("/imap/sync", { method: "POST" }),
-    onSuccess: (r) => {
+    mutationFn: () => api<SyncLog[]>("/imap/sync", { method: "POST" }),
+    onSuccess: (journaux) => {
       qc.invalidateQueries();
-      if (r.erreur && r.nb_mails === 0) toast.error(r.erreur);
-      else toast.success(r.nb_mails ? `${r.nb_mails} nouveau(x) mail(s)` : "Aucun nouveau mail");
+      const nb = journaux.reduce((t, j) => t + j.nb_mails, 0);
+      const erreurs = journaux.filter((j) => j.erreur && j.nb_mails === 0);
+      for (const j of erreurs) toast.error(j.erreur, { duration: 8000 });
+      if (nb || !erreurs.length) toast.success(nb ? `${nb} nouveau(x) mail(s)` : "Aucun nouveau mail");
     },
     onError: (e: Error) => toast.error(e.message),
   });

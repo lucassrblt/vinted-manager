@@ -21,6 +21,7 @@ export interface Article {
   statut: Statut;
   batch_id: number | null;
   batch_nom: string | null;
+  compte_id: number | null;
   source: string | null;
   date_achat: string | null;
   date_reception: string | null;
@@ -285,6 +286,8 @@ export interface DonneesExtraites {
 
 export interface EmailResume {
   id: number;
+  compte_id: number | null;
+  compte: string | null;
   date: string | null;
   expediteur: string | null;
   sujet: string | null;
@@ -316,6 +319,7 @@ export interface VenteAConfirmer {
   email_id: number;
   date: string | null;
   sujet: string | null;
+  compte: string | null;
   donnees: DonneesExtraites;
   candidats: Candidat[];
 }
@@ -360,14 +364,22 @@ export interface Regle {
   created_at: string;
 }
 
-export interface ConfigImap {
-  serveur: string | null;
-  port: number | null;
-  email: string | null;
-  dossier: string;
-  mot_de_passe_defini: boolean;
-  expediteurs: string[];
+export interface CompteVinted {
+  id: number;
+  nom: string;
+  imap_serveur: string;
+  imap_port: number;
+  imap_email: string;
+  imap_dossier: string;
+  actif: boolean;
   derniere_synchro: string | null;
+  nb_articles: number;
+  nb_mails: number;
+}
+
+export interface ConfigMails {
+  comptes: CompteVinted[];
+  expediteurs: string[];
   presets: Record<string, { serveur: string; port: number }>;
 }
 
@@ -377,6 +389,7 @@ export interface SyncLog {
   fin: string | null;
   nb_mails: number;
   erreur: string | null;
+  compte_id: number | null;
 }
 
 // --- Étape 3 : annonces, prix conseillé, messages ------------------------------------------

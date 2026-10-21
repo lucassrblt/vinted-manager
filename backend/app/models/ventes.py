@@ -29,6 +29,9 @@ class EmailVinted(TimestampMixin, Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     message_id: Mapped[str] = mapped_column(String(500), unique=True)
+    compte_id: Mapped[int | None] = mapped_column(
+        ForeignKey("compte_vinted.id", ondelete="SET NULL"), index=True
+    )
     date: Mapped[datetime | None]
     expediteur: Mapped[str | None] = mapped_column(String(255))
     sujet: Mapped[str | None] = mapped_column(String(500))
@@ -106,3 +109,4 @@ class SyncLog(Base):
     fin: Mapped[datetime | None]
     nb_mails: Mapped[int] = mapped_column(default=0)
     erreur: Mapped[str | None] = mapped_column(Text)
+    compte_id: Mapped[int | None] = mapped_column(ForeignKey("compte_vinted.id", ondelete="CASCADE"))

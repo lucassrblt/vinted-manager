@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 
 from app.api.deps import Db, get_parametres
-from app.models import Article, EmailVinted, PieceJointe, RegleClassement, SyncLog
+from app.models import Article, CompteVinted, EmailVinted, PieceJointe, RegleClassement, SyncLog
 from app.models.enums import StatutTraitementEmail, TypeEmail
 from app.seed import regles as seed
 from app.services import classifieur, crypto, imap_sync, storage, traitement
@@ -23,74 +23,159 @@ router = APIRouter(tags=["mails"])
 # --- Configuration IMAP -----------------------------------------------------------------------
 
 
-class ImapOut(BaseModel):
-    serveur: str | None
-    port: int | None
-    email: str | None
-    dossier: str
-    mot_de_passe_defini: bool
-    expediteurs: list[str]
+class CompteOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    nom: str
+    imap_serveur: str
+    imap_port: int
+    imap_email: str
+    imap_dossier: str
+    actif: bool
     derniere_synchro: datetime | None
+    nb_articles: int = 0
+    nb_mails: int = 0
+
+
+class ConfigMailsOut(BaseModel):
+    comptes: list[CompteOut]
+    expediteurs: list[str]
     presets: dict[str, dict[str, Any]]
 
 
-class ImapIn(BaseModel):
+class CompteIn(BaseModel):
+    nom: str = Field(min_length=1, max_length=80)
     serveur: str = Field(min_length=3, max_length=255)
     port: int = Field(default=993, ge=1, le=65535)
     email: str = Field(min_length=3, max_length=255)
     # Vide = conserver le mot de passe déjà enregistré
     mot_de_passe: str | None = None
     dossier: str = Field(default="INBOX", min_length=1, max_length=255)
-    expediteurs: list[str] = Field(default_factory=lambda: ["vinted"])
+    actif: bool = True
 
 
-def _imap_out(db: Db) -> ImapOut:
-    p = get_parametres(db)
-    return ImapOut(
-        serveur=p.imap_serveur,
-        port=p.imap_port,
-        email=p.imap_email,
-        dossier=p.imap_dossier,
-        mot_de_passe_defini=bool(p.imap_mot_de_passe_chiffre),
-        expediteurs=p.expediteurs_vinted or [],
-        derniere_synchro=p.derniere_synchro,
+class TestImapIn(BaseModel):
+    serveur: str = Field(min_length=3, max_length=255)
+    port: int = Field(default=993, ge=1, le=65535)
+    email: str = Field(min_length=3, max_length=255)
+    mot_de_passe: str | None = None
+    dossier: str = Field(default="INBOX", min_length=1, max_length=255)
+    # Compte existant : son mot de passe enregistré sert si aucun n'est saisi
+    compte_id: int | None = None
+
+
+class ExpediteursIn(BaseModel):
+    expediteurs: list[str]
+
+
+def _compte_out(db: Db, c: CompteVinted) -> CompteOut:
+    out = CompteOut.model_validate(c)
+    out.nb_articles = db.scalar(select(func.count(Article.id)).where(Article.compte_id == c.id)) or 0
+    out.nb_mails = db.scalar(select(func.count(EmailVinted.id)).where(EmailVinted.compte_id == c.id)) or 0
+    return out
+
+
+def _config_out(db: Db) -> ConfigMailsOut:
+    comptes = db.scalars(select(CompteVinted).order_by(CompteVinted.id)).all()
+    return ConfigMailsOut(
+        comptes=[_compte_out(db, c) for c in comptes],
+        expediteurs=get_parametres(db).expediteurs_vinted or [],
         presets=imap_sync.PRESETS,
     )
 
 
-@router.get("/parametres/imap", response_model=ImapOut)
-def lire_imap(db: Db) -> ImapOut:
-    return _imap_out(db)
+def _get_compte(db: Db, compte_id: int) -> CompteVinted:
+    compte = db.get(CompteVinted, compte_id)
+    if compte is None:
+        raise HTTPException(404, "Compte introuvable.")
+    return compte
 
 
-@router.put("/parametres/imap", response_model=ImapOut)
-def enregistrer_imap(data: ImapIn, db: Db) -> ImapOut:
-    p = get_parametres(db)
-    if data.mot_de_passe:
-        try:
-            p.imap_mot_de_passe_chiffre = crypto.chiffrer(data.mot_de_passe)
-        except crypto.CleManquante as exc:
-            raise HTTPException(500, str(exc)) from exc
-    elif not p.imap_mot_de_passe_chiffre:
-        raise HTTPException(422, "Saisis le mot de passe (d'application) de la boîte mail.")
-    p.imap_serveur = data.serveur.strip()
-    p.imap_port = data.port
-    p.imap_email = data.email.strip()
-    p.imap_dossier = data.dossier.strip()
-    p.expediteurs_vinted = [e.strip() for e in data.expediteurs if e.strip()] or ["vinted"]
+def _chiffrer(mot_de_passe: str) -> str:
+    try:
+        return crypto.chiffrer(mot_de_passe)
+    except crypto.CleManquante as exc:
+        raise HTTPException(500, str(exc)) from exc
+
+
+def _verifier_unicite(db: Db, email: str, sauf: int | None = None) -> None:
+    requete = select(CompteVinted.id).where(func.lower(CompteVinted.imap_email) == email.lower())
+    if sauf is not None:
+        requete = requete.where(CompteVinted.id != sauf)
+    if db.scalar(requete):
+        raise HTTPException(409, f"La boîte {email} est déjà branchée sur un autre compte.")
+
+
+@router.get("/parametres/mails", response_model=ConfigMailsOut)
+def lire_config_mails(db: Db) -> ConfigMailsOut:
+    return _config_out(db)
+
+
+@router.put("/parametres/mails/expediteurs", response_model=ConfigMailsOut)
+def enregistrer_expediteurs(data: ExpediteursIn, db: Db) -> ConfigMailsOut:
+    get_parametres(db).expediteurs_vinted = [e.strip() for e in data.expediteurs if e.strip()] or ["vinted"]
     db.commit()
-    return _imap_out(db)
+    return _config_out(db)
+
+
+@router.get("/comptes", response_model=list[CompteOut])
+def lister_comptes(db: Db) -> list[CompteOut]:
+    return _config_out(db).comptes
+
+
+@router.post("/comptes", response_model=CompteOut, status_code=201)
+def creer_compte(data: CompteIn, db: Db) -> CompteOut:
+    if not data.mot_de_passe:
+        raise HTTPException(422, "Saisis le mot de passe (d'application) de la boîte mail.")
+    _verifier_unicite(db, data.email.strip())
+    compte = CompteVinted(
+        nom=data.nom.strip(),
+        imap_serveur=data.serveur.strip(),
+        imap_port=data.port,
+        imap_email=data.email.strip(),
+        imap_mot_de_passe_chiffre=_chiffrer(data.mot_de_passe),
+        imap_dossier=data.dossier.strip(),
+        actif=data.actif,
+    )
+    db.add(compte)
+    db.commit()
+    return _compte_out(db, compte)
+
+
+@router.put("/comptes/{compte_id}", response_model=CompteOut)
+def modifier_compte(compte_id: int, data: CompteIn, db: Db) -> CompteOut:
+    compte = _get_compte(db, compte_id)
+    _verifier_unicite(db, data.email.strip(), sauf=compte.id)
+    if data.mot_de_passe:
+        compte.imap_mot_de_passe_chiffre = _chiffrer(data.mot_de_passe)
+    if data.email.strip().lower() != compte.imap_email.lower() or data.dossier.strip() != compte.imap_dossier:
+        compte.derniere_synchro = None  # nouvelle boîte : on relit les 30 derniers jours
+    compte.nom = data.nom.strip()
+    compte.imap_serveur = data.serveur.strip()
+    compte.imap_port = data.port
+    compte.imap_email = data.email.strip()
+    compte.imap_dossier = data.dossier.strip()
+    compte.actif = data.actif
+    db.commit()
+    return _compte_out(db, compte)
+
+
+@router.delete("/comptes/{compte_id}", status_code=204)
+def supprimer_compte(compte_id: int, db: Db) -> None:
+    """Débranche la boîte. Les mails, ventes et articles déjà importés sont conservés."""
+    db.delete(_get_compte(db, compte_id))
+    db.commit()
 
 
 @router.post("/imap/test")
-def tester_imap(data: ImapIn, db: Db) -> dict[str, Any]:
-    p = get_parametres(db)
+def tester_imap(data: TestImapIn, db: Db) -> dict[str, Any]:
     mot_de_passe = data.mot_de_passe
     if not mot_de_passe:
-        if not p.imap_mot_de_passe_chiffre:
+        if data.compte_id is None:
             raise HTTPException(422, "Saisis le mot de passe (d'application) de la boîte mail.")
         try:
-            mot_de_passe = crypto.dechiffrer(p.imap_mot_de_passe_chiffre)
+            mot_de_passe = crypto.dechiffrer(_get_compte(db, data.compte_id).imap_mot_de_passe_chiffre)
         except crypto.CleManquante as exc:
             raise HTTPException(500, str(exc)) from exc
     cfg = imap_sync.ConfigImap(
@@ -111,10 +196,11 @@ class SyncOut(BaseModel):
     fin: datetime | None
     nb_mails: int
     erreur: str | None
+    compte_id: int | None
 
 
-@router.post("/imap/sync", response_model=SyncOut)
-def synchroniser(db: Db) -> SyncLog:
+@router.post("/imap/sync", response_model=list[SyncOut])
+def synchroniser(db: Db) -> list[SyncLog]:
     try:
         return imap_sync.synchroniser(db, get_parametres(db))
     except imap_sync.ErreurImap as exc:
@@ -129,9 +215,13 @@ def journal(db: Db) -> list[SyncLog]:
 # --- Mails ------------------------------------------------------------------------------------
 
 
-def _email_resume(e: EmailVinted, regles: dict[int, str], articles: dict[int, str]) -> dict[str, Any]:
+def _email_resume(
+    e: EmailVinted, regles: dict[int, str], articles: dict[int, str], comptes: dict[int, str]
+) -> dict[str, Any]:
     return {
         "id": e.id,
+        "compte_id": e.compte_id,
+        "compte": comptes.get(e.compte_id) if e.compte_id else None,
         "date": e.date,
         "expediteur": e.expediteur,
         "sujet": e.sujet,
@@ -151,6 +241,7 @@ def lister_emails(
     db: Db,
     statut: list[StatutTraitementEmail] | None = Query(None),
     type: list[TypeEmail] | None = Query(None),
+    compte: int | None = None,
     page: int = Query(1, ge=1),
     taille_page: int = Query(50, ge=1, le=200),
 ) -> dict[str, Any]:
@@ -159,6 +250,8 @@ def lister_emails(
         q = q.where(EmailVinted.statut_traitement.in_([s.value for s in statut]))
     if type:
         q = q.where(EmailVinted.type_detecte.in_([t.value for t in type]))
+    if compte is not None:
+        q = q.where(EmailVinted.compte_id == compte)
     total = db.scalar(select(func.count()).select_from(q.subquery())) or 0
     emails = db.scalars(
         q.order_by(EmailVinted.date.desc()).offset((page - 1) * taille_page).limit(taille_page)
@@ -171,7 +264,7 @@ def lister_emails(
         else {}
     )
     return {
-        "items": [_email_resume(e, regles, articles) for e in emails],
+        "items": [_email_resume(e, regles, articles, imap_sync.noms_comptes(db)) for e in emails],
         "total": total,
         "compteurs": dict(
             db.execute(
@@ -196,7 +289,8 @@ def detail_email(email_id: int, db: Db) -> dict[str, Any]:
     pieces = db.scalars(select(PieceJointe).where(PieceJointe.email_id == e.id)).all()
     regles = dict(db.execute(select(RegleClassement.id, RegleClassement.nom)).tuples().all())
     article = db.get(Article, e.article_id) if e.article_id else None
-    return _email_resume(e, regles, {article.id: article.nom} if article else {}) | {
+    articles = {article.id: article.nom} if article else {}
+    return _email_resume(e, regles, articles, imap_sync.noms_comptes(db)) | {
         "corps_texte": e.corps_texte,
         "corps_html": e.corps_html,
         "pieces_jointes": [{"id": p.id, "nom": p.nom, "mime": p.mime} for p in pieces],

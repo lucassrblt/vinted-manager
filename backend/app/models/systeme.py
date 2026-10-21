@@ -80,13 +80,7 @@ class Parametres(Base):
     objectif_ventes_jour: Mapped[int] = mapped_column(default=3)
     arrondi_seuil: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("30"))
     arrondi_pas: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("5"))
-    imap_serveur: Mapped[str | None] = mapped_column(String(255))
-    imap_port: Mapped[int | None]
-    imap_email: Mapped[str | None] = mapped_column(String(255))
-    imap_mot_de_passe_chiffre: Mapped[str | None] = mapped_column(Text)
-    imap_dossier: Mapped[str] = mapped_column(String(255), default="INBOX")
     expediteurs_vinted: Mapped[list[str]] = mapped_column(JSON, default=lambda: ["vinted.fr", "vinted.com"])
-    derniere_synchro: Mapped[datetime | None]
     # Photos IA : modèle par type de photo (None = choix par défaut du code), modèle « haute qualité »
     # utilisé par le bouton de régénération premium, et photo du fond (tapis) servant de référence.
     modeles_photos: Mapped[dict[str, str] | None] = mapped_column(JSON)
@@ -96,3 +90,19 @@ class Parametres(Base):
         JSON,
         default=lambda: {"vente": True, "litige": True, "offre": True, "rappel_envois": True},
     )
+
+
+class CompteVinted(TimestampMixin, Base):
+    """Un compte Vinted et la boîte mail qui reçoit ses notifications (lue en IMAP)."""
+
+    __tablename__ = "compte_vinted"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nom: Mapped[str] = mapped_column(String(80))
+    imap_serveur: Mapped[str] = mapped_column(String(255))
+    imap_port: Mapped[int] = mapped_column(default=993)
+    imap_email: Mapped[str] = mapped_column(String(255))
+    imap_mot_de_passe_chiffre: Mapped[str] = mapped_column(Text)
+    imap_dossier: Mapped[str] = mapped_column(String(255), default="INBOX")
+    actif: Mapped[bool] = mapped_column(default=True)
+    derniere_synchro: Mapped[datetime | None]

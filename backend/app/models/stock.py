@@ -42,6 +42,10 @@ class Article(TimestampMixin, Base):
     prix_vente_reel: Mapped[Decimal | None] = mapped_column(Money)
     statut: Mapped[str] = mapped_column(String(30), default=StatutArticle.RECU_A_PUBLIER, index=True)
     batch_id: Mapped[int | None] = mapped_column(ForeignKey("batch.id", ondelete="SET NULL"), index=True)
+    # Compte Vinted sur lequel l'article est en vente (None = pas encore attribué)
+    compte_id: Mapped[int | None] = mapped_column(
+        ForeignKey("compte_vinted.id", ondelete="SET NULL"), index=True
+    )
     source: Mapped[str | None] = mapped_column(String(120))
     date_achat: Mapped[date | None]
     date_reception: Mapped[datetime | None]

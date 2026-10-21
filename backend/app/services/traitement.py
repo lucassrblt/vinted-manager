@@ -48,13 +48,15 @@ def _date(v: Any) -> datetime | None:
 # --- Enregistrement ---------------------------------------------------------------------------
 
 
-def enregistrer_mail(db: Session, mail: MailLu) -> EmailVinted | None:
-    """Enregistre, classe et traite un mail. Renvoie None s'il est déjà connu (Message-ID)."""
+def enregistrer_mail(db: Session, mail: MailLu, compte_id: int | None = None) -> EmailVinted | None:
+    """Enregistre, classe et traite un mail reçu sur la boîte du compte `compte_id`.
+    Renvoie None s'il est déjà connu (Message-ID)."""
     if db.scalar(select(EmailVinted.id).where(EmailVinted.message_id == mail.message_id)):
         return None
     resultat = classifieur.classer(regles_actives(db), mail)
     email = EmailVinted(
         message_id=mail.message_id,
+        compte_id=compte_id,
         date=mail.date or utcnow(),
         expediteur=mail.expediteur[:255],
         sujet=mail.sujet[:500],
@@ -104,7 +106,9 @@ def appliquer(db: Session, email: EmailVinted, article: Article | None = None) -
 def _vente(db: Session, email: EmailVinted, article: Article | None) -> None:
     d = email.donnees_extraites or {}
     if article is None:
-        liste = rapprochement.candidats(db, d.get("titre_article"), _decimal(d.get("prix")))
+        liste = rapprochement.candidats(
+            db, d.get("titre_article"), _decimal(d.get("prix")), compte_id=email.compte_id
+        )
         choix = rapprochement.choix_automatique(liste)
         if choix is None:
             email.statut_traitement = StatutTraitementEmail.NOUVEAU  # -> « Ventes à confirmer »
@@ -137,6 +141,8 @@ def confirmer_vente(db: Session, email: EmailVinted, article: Article, auto: boo
     db.add(vente)
     db.flush()
     article.prix_vente_reel = prix
+    if article.compte_id is None:
+        article.compte_id = email.compte_id  # l'article était donc en vente sur ce compte
     changer_statut(
         db,
         article,
@@ -282,14 +288,20 @@ def _suivi_colis(db: Session, email: EmailVinted, article: Article | None) -> No
 
 
 def _article_par_titre(
-    db: Session, titre: str | None, statuts: list[StatutArticle], doublons_ok: bool = False
+    db: Session,
+    titre: str | None,
+    statuts: list[StatutArticle],
+    doublons_ok: bool = False,
+    compte_id: int | None = None,
 ) -> Article | None:
     """Article dont le nom correspond nettement au titre. `doublons_ok` : si les meilleurs candidats sont
     des exemplaires identiques (même nom, même prix), le premier convient (utile pour un message)."""
     if not titre:
         return None
     articles = db.scalars(
-        select(Article).where(Article.statut.in_([s.value for s in statuts])).order_by(Article.id)
+        rapprochement.du_compte(
+            select(Article).where(Article.statut.in_([s.value for s in statuts])), compte_id
+        ).order_by(Article.id)
     ).all()
     scores = sorted(
         ((rapprochement.score_titre(titre, a), a) for a in articles), key=lambda x: x[0], reverse=True
@@ -318,7 +330,10 @@ def _litige(db: Session, email: EmailVinted, article: Article | None) -> None:
         article = db.get(Article, vente.article_id) if vente else None
     if article is None:
         article = _article_par_titre(
-            db, d.get("titre_article"), [StatutArticle.VENDU, StatutArticle.ENVOYE, StatutArticle.LIVRE]
+            db,
+            d.get("titre_article"),
+            [StatutArticle.VENDU, StatutArticle.ENVOYE, StatutArticle.LIVRE],
+            compte_id=email.compte_id,
         )
     # Même non rattaché, un litige est signalé tout de suite.
     notifier(
@@ -344,7 +359,9 @@ def _message(db: Session, email: EmailVinted, article: Article | None) -> None:
     for statuts in ([StatutArticle.EN_LIGNE], [StatutArticle.RECU_A_PUBLIER, StatutArticle.VENDU]):
         if article is not None:
             break
-        article = _article_par_titre(db, d.get("titre_article"), statuts, doublons_ok=True)
+        article = _article_par_titre(
+            db, d.get("titre_article"), statuts, doublons_ok=True, compte_id=email.compte_id
+        )
     existant = db.scalar(select(Message).where(Message.email_id == email.id))
     if existant is None:
         db.add(

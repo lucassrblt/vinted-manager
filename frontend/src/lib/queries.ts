@@ -4,11 +4,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import { api } from "@/lib/api";
-import type { Article, BatchStats, Page, Parametres, Statut } from "@/lib/types";
+import type { Article, BatchStats, CompteVinted, Page, Parametres, Statut } from "@/lib/types";
 
 export interface FiltresStock {
   statut?: Statut[];
   batch_id?: number[];
+  compte_id?: number[];
   marque?: string[];
   categorie?: string[];
   taille?: string[];
@@ -42,6 +43,10 @@ export function useValeursFiltres() {
 
 export function useBatches() {
   return useQuery({ queryKey: ["batches"], queryFn: () => api<BatchStats[]>("/batches") });
+}
+
+export function useComptes() {
+  return useQuery({ queryKey: ["comptes"], queryFn: () => api<CompteVinted[]>("/comptes"), staleTime: 60_000 });
 }
 
 export function useParametres() {
@@ -91,8 +96,13 @@ export function useChangerStatut() {
 export function useActionGroupee() {
   const invalider = useInvaliderStock();
   return useMutation({
-    mutationFn: (corps: { ids: number[]; action: string; statut?: Statut; batch_id?: number | null }) =>
-      api<{ modifies: number }>("/articles/bulk", { body: corps }),
+    mutationFn: (corps: {
+      ids: number[];
+      action: string;
+      statut?: Statut;
+      batch_id?: number | null;
+      compte_id?: number | null;
+    }) => api<{ modifies: number }>("/articles/bulk", { body: corps }),
     onSuccess: () => invalider(),
     onError: (e: Error) => toast.error(e.message),
   });

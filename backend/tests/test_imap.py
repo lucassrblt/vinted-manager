@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_parametres
 from app.db import utcnow
-from app.models import EmailVinted, SyncLog
+from app.models import Article, CompteVinted, EmailVinted, SyncLog
 from app.services import bordereaux, crypto, imap_sync
 from tests import mails_synthetiques as ms
 
@@ -52,35 +52,42 @@ class FauxImap:
         pass
 
 
-def _configurer(db: Session) -> None:
-    p = get_parametres(db)
-    p.imap_serveur, p.imap_port, p.imap_email = "imap.gmail.com", 993, "moi@gmail.com"
-    p.imap_mot_de_passe_chiffre = crypto.chiffrer("abcd efgh ijkl mnop")
-    p.expediteurs_vinted = ["vinted.fr", "vinted.com"]
+def _configurer(db: Session, email: str = "moi@gmail.com", nom: str = "Perso") -> CompteVinted:
+    compte = CompteVinted(
+        nom=nom,
+        imap_serveur="imap.gmail.com",
+        imap_port=993,
+        imap_email=email,
+        imap_mot_de_passe_chiffre=crypto.chiffrer("abcd efgh ijkl mnop"),
+    )
+    db.add(compte)
+    get_parametres(db).expediteurs_vinted = ["vinted.fr", "vinted.com"]
     db.commit()
+    return compte
 
 
 def test_synchro_lecture_seule_et_dedoublonnage(db: Session, regles: None) -> None:
-    _configurer(db)
+    compte = _configurer(db)
     faux = FauxImap([ms.VENTE, ms.ARGENT, ms.INCONNU])
-    journal = imap_sync.synchroniser(db, get_parametres(db), lambda *_: faux)
-    assert journal.erreur is None and journal.nb_mails == 3
+    [journal] = imap_sync.synchroniser(db, get_parametres(db), lambda *_: faux)
+    assert journal.erreur is None and journal.nb_mails == 3 and journal.compte_id == compte.id
     assert faux.readonly is True
     recherche = next(c for c in faux.commandes if c[0] == "SEARCH")
     assert 'OR FROM "vinted.fr" FROM "vinted.com"' in recherche[-1] and "SINCE" in recherche[-1]
     # Deuxième passage : mêmes mails, rien de nouveau
-    journal = imap_sync.synchroniser(
+    [journal] = imap_sync.synchroniser(
         db, get_parametres(db), lambda *_: FauxImap([ms.VENTE, ms.ARGENT, ms.INCONNU])
     )
     assert journal.nb_mails == 0
     assert db.scalar(select(func.count(EmailVinted.id))) == 3
-    params = get_parametres(db)
-    assert params.derniere_synchro is not None and params.derniere_synchro > utcnow() - timedelta(minutes=1)
+    assert set(db.scalars(select(EmailVinted.compte_id))) == {compte.id}
+    db.refresh(compte)
+    assert compte.derniere_synchro is not None and compte.derniere_synchro > utcnow() - timedelta(minutes=1)
 
 
 def test_synchro_mail_illisible_ne_bloque_pas(db: Session, regles: None) -> None:
     _configurer(db)
-    journal = imap_sync.synchroniser(
+    [journal] = imap_sync.synchroniser(
         db, get_parametres(db), lambda *_: FauxImap([b"\x00\xff pas un mail", ms.ARGENT])
     )
     assert db.scalar(select(func.count(EmailVinted.id))) >= 1
@@ -94,30 +101,108 @@ def test_message_clair_gmail(db: Session) -> None:
         imap_sync.tester_connexion(cfg, lambda *_: faux)
 
 
+def test_message_clair_adresse_gmail_inconnue() -> None:
+    cfg = imap_sync.ConfigImap("imap.gmail.com", 993, "inconnu@gmail.com", "x")
+    faux = FauxImap([], erreur_login="b'Lookup failed 5c2dc87 mb3963'")
+    with pytest.raises(imap_sync.ErreurImap, match="ne connaît pas l'adresse inconnu@gmail.com"):
+        imap_sync.tester_connexion(cfg, lambda *_: faux)
+
+
 def test_synchro_non_configuree_journalisee(db: Session) -> None:
-    journal = imap_sync.synchroniser(db, get_parametres(db), lambda *_: FauxImap([]))
+    [journal] = imap_sync.synchroniser(db, get_parametres(db), lambda *_: FauxImap([]))
     assert journal.erreur is not None and "configurée" in journal.erreur
     assert db.scalar(select(func.count(SyncLog.id))) == 1
 
 
-def test_config_imap_mot_de_passe_chiffre(client: TestClient, db: Session) -> None:
+def test_comptes_mot_de_passe_chiffre(client: TestClient, db: Session) -> None:
     corps = {
+        "nom": "Perso",
         "serveur": "imap.gmail.com",
         "port": 993,
         "email": "moi@gmail.com",
         "mot_de_passe": "secret-app",
         "dossier": "INBOX",
     }
-    r = client.put("/api/parametres/imap", json=corps)
-    assert r.status_code == 200 and r.json()["mot_de_passe_defini"] is True
+    r = client.post("/api/comptes", json=corps)
+    assert r.status_code == 201, r.text
     assert "secret" not in r.text
-    p = get_parametres(db)
-    db.refresh(p)
-    assert p.imap_mot_de_passe_chiffre and "secret-app" not in p.imap_mot_de_passe_chiffre
-    assert crypto.dechiffrer(p.imap_mot_de_passe_chiffre) == "secret-app"
+    id_compte = r.json()["id"]
+    compte = db.get(CompteVinted, id_compte)
+    assert compte is not None and "secret-app" not in compte.imap_mot_de_passe_chiffre
+    assert crypto.dechiffrer(compte.imap_mot_de_passe_chiffre) == "secret-app"
     # Sans mot de passe : l'ancien est conservé
-    r = client.put("/api/parametres/imap", json=corps | {"mot_de_passe": None, "dossier": "Vinted"})
-    assert r.json()["dossier"] == "Vinted" and r.json()["mot_de_passe_defini"] is True
+    r = client.put(f"/api/comptes/{id_compte}", json=corps | {"mot_de_passe": None, "dossier": "Vinted"})
+    assert r.status_code == 200 and r.json()["imap_dossier"] == "Vinted"
+    db.refresh(compte)
+    assert crypto.dechiffrer(compte.imap_mot_de_passe_chiffre) == "secret-app"
+    # Même adresse branchée deux fois : refusé ; création sans mot de passe : refusée
+    assert (
+        client.post("/api/comptes", json=corps | {"nom": "Bis", "email": "MOI@gmail.com"}).status_code == 409
+    )
+    assert (
+        client.post("/api/comptes", json=corps | {"email": "b@gmail.com", "mot_de_passe": None}).status_code
+        == 422
+    )
+    config = client.get("/api/parametres/mails").json()
+    assert [c["nom"] for c in config["comptes"]] == ["Perso"] and "gmail" in config["presets"]
+
+
+def test_deux_comptes_synchronises_et_rapproches_separement(
+    client: TestClient, db: Session, regles: None
+) -> None:
+    perso = _configurer(db, "perso@gmail.com", "Perso")
+    pro = _configurer(db, "pro@gmail.com", "Pro")
+    # Le même pull est en vente sur les deux comptes : chaque vente va à l'exemplaire de son compte.
+    nom = "Pull demi-zip polaire Ralph Lauren - Noir"
+    pull_perso = Article(nom=nom, prix_vente_cible=45, statut="en_ligne", compte_id=perso.id)
+    pull_pro = Article(nom=nom, prix_vente_cible=45, statut="en_ligne", compte_id=pro.id)
+    db.add_all([pull_perso, pull_pro])
+    db.commit()
+    vente_pro = ms.mail(
+        "Ton article a été vendu !",
+        f"Bonne nouvelle ! marc_92 a acheté ton article « {nom} ».\nPrix : 45,00 €\nCommande n° 99",
+        message_id="<vente-pro@vinted.fr>",
+    )
+    boites = {"perso@gmail.com": [ms.ARGENT], "pro@gmail.com": [vente_pro]}
+
+    # Chaque connexion sert la boîte de l'adresse utilisée.
+    originale = FauxImap.login
+
+    def login(self: FauxImap, email: str, mdp: str) -> None:
+        self.mails = boites[email]
+        originale(self, email, mdp)
+
+    FauxImap.login = login  # type: ignore[method-assign]
+    try:
+        journaux = imap_sync.synchroniser(db, get_parametres(db), lambda *_: FauxImap([]))
+    finally:
+        FauxImap.login = originale  # type: ignore[method-assign]
+    assert [(j.compte_id, j.nb_mails, j.erreur) for j in journaux] == [(perso.id, 1, None), (pro.id, 1, None)]
+    db.refresh(pull_perso)
+    db.refresh(pull_pro)
+    assert pull_pro.statut == "vendu" and pull_perso.statut == "en_ligne"
+    mails = client.get("/api/emails").json()["items"]
+    assert {m["compte"] for m in mails} == {"Perso", "Pro"}
+    assert client.get(f"/api/emails?compte={pro.id}").json()["total"] == 1
+    assert client.get(f"/api/articles?compte_id={pro.id}").json()["total"] == 1
+    # Débrancher une boîte conserve ses mails et ses articles
+    assert client.delete(f"/api/comptes/{pro.id}").status_code == 204
+    assert db.scalar(select(func.count(EmailVinted.id))) == 2
+    db.refresh(pull_pro)
+    assert pull_pro.compte_id is None
+
+
+def test_vente_attribue_le_compte_a_l_article(db: Session, regles: None) -> None:
+    from app.services.email_parser import lire_mail
+    from app.services.traitement import enregistrer_mail
+
+    compte = _configurer(db)
+    pull = Article(nom="Pull demi-zip polaire Ralph Lauren - Noir", prix_vente_cible=45, statut="en_ligne")
+    db.add(pull)
+    db.commit()
+    enregistrer_mail(db, lire_mail(ms.VENTE), compte_id=compte.id)
+    db.refresh(pull)
+    assert pull.statut == "vendu" and pull.compte_id == compte.id
 
 
 def test_critere_expediteurs() -> None:

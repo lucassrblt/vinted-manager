@@ -9,6 +9,7 @@ from app.models.stock import (
 )
 from app.models.systeme import (
     AbonnementPush,
+    CompteVinted,
     ModeleAnnonce,
     ModeleReponse,
     Parametres,
@@ -22,6 +23,7 @@ __all__ = [
     "AbonnementPush",
     "Article",
     "Batch",
+    "CompteVinted",
     "EmailVinted",
     "Envoi",
     "HistoriqueStatut",

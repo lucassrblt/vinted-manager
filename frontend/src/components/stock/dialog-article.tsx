@@ -21,7 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { api } from "@/lib/api";
 import { formatEuros, saisieVersDecimal } from "@/lib/format";
-import { useBatches, useInvaliderStock } from "@/lib/queries";
+import { useBatches, useComptes, useInvaliderStock } from "@/lib/queries";
 import { ETATS, ORDRE_STATUTS, STATUTS } from "@/lib/statuts";
 import type { Article } from "@/lib/types";
 
@@ -36,6 +36,7 @@ const VIDE = {
   remise: "",
   prix_vente_cible: "",
   batch_id: "",
+  compte_id: "",
   source: "",
   statut: "recu_a_publier",
   notes: "",
@@ -45,6 +46,7 @@ export function DialogArticle({ ouvert, setOuvert }: { ouvert: boolean; setOuver
   const router = useRouter();
   const invalider = useInvaliderStock();
   const { data: batches } = useBatches();
+  const { data: comptes } = useComptes();
   const [f, setF] = useState(VIDE);
   const maj = (cle: keyof typeof VIDE) => (v: string) => setF((p) => ({ ...p, [cle]: v }));
 
@@ -73,6 +75,7 @@ export function DialogArticle({ ouvert, setOuvert }: { ouvert: boolean; setOuver
           remise,
           prix_vente_cible: saisieVersDecimal(f.prix_vente_cible),
           batch_id: f.batch_id ? Number(f.batch_id) : null,
+          compte_id: f.compte_id ? Number(f.compte_id) : comptes?.length === 1 ? comptes[0].id : null,
           source: f.source || null,
           statut: f.statut,
           notes: f.notes || null,
@@ -198,6 +201,22 @@ export function DialogArticle({ ouvert, setOuvert }: { ouvert: boolean; setOuver
               </SelectContent>
             </Select>
           </Champ>
+          {(comptes?.length ?? 0) > 1 && (
+            <Champ id="compte" libelle="Compte Vinted">
+              <Select value={f.compte_id} onValueChange={maj("compte_id")}>
+                <SelectTrigger id="compte" className="w-full">
+                  <SelectValue placeholder="Pas encore attribué" />
+                </SelectTrigger>
+                <SelectContent>
+                  {comptes?.map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>
+                      {c.nom}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Champ>
+          )}
           <Champ id="source" libelle="Source">
             <Input id="source" value={f.source} onChange={(e) => maj("source")(e.target.value)} placeholder="Hacoo" />
           </Champ>

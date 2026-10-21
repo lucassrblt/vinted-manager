@@ -135,7 +135,9 @@ Paramètres → Sauvegarde → « Télécharger la sauvegarde complète » : un 
 Gmail refuse ton mot de passe habituel en IMAP :
 1. Active la validation en deux étapes : https://myaccount.google.com/security
 2. Va sur https://myaccount.google.com/apppasswords, crée un mot de passe nommé « Revente » et copie les 16 caractères.
-3. Dans l'app : **Paramètres → Mails**, serveur `imap.gmail.com`, port `993`, ton adresse et ce mot de passe d'application.
+3. Dans l'app : **Paramètres → Mails → Ajouter une boîte**, donne un nom au compte Vinted, puis ton adresse et ce mot de passe d'application (Gmail est présélectionné).
+
+Une boîte par compte Vinted : refais l'opération pour chaque compte (le mot de passe d'application se crée sur le compte Google de chaque adresse).
 
 ### Améliorer la reconnaissance des mails Vinted
 

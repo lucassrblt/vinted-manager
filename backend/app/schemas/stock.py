@@ -22,6 +22,7 @@ class ArticleBase(BaseModel):
     prix_vente_cible: Decimal | None = Field(default=None, ge=0)
     prix_vente_reel: Decimal | None = Field(default=None, ge=0)
     batch_id: int | None = None
+    compte_id: int | None = None
     source: str | None = None
     date_achat: date | None = None
     notes: str | None = None
@@ -48,6 +49,7 @@ class ArticleUpdate(BaseModel):
     prix_vente_cible: Decimal | None = Field(default=None, ge=0)
     prix_vente_reel: Decimal | None = Field(default=None, ge=0)
     batch_id: int | None = None
+    compte_id: int | None = None
     source: str | None = None
     date_achat: date | None = None
     date_publication: datetime | None = None
@@ -80,6 +82,7 @@ class ArticleOut(BaseModel):
     statut: StatutArticle
     batch_id: int | None
     batch_nom: str | None = None
+    compte_id: int | None
     source: str | None
     date_achat: date | None
     date_reception: datetime | None
@@ -159,9 +162,10 @@ class ChangementStatut(BaseModel):
 
 class ActionGroupee(BaseModel):
     ids: list[int] = Field(min_length=1, max_length=500)
-    action: str  # statut | publie_aujourdhui | batch | supprimer
+    action: str  # statut | publie_aujourdhui | batch | compte | supprimer
     statut: StatutArticle | None = None
     batch_id: int | None = None
+    compte_id: int | None = None
 
 
 class BatchArticleIn(BaseModel):

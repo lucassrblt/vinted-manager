@@ -7,6 +7,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { EnTetePage, EtatVide, LignesSquelette, MessageErreur } from "@/components/commun";
+import { BadgeCompte } from "@/components/badge-compte";
 import { BoutonSynchro } from "@/components/mails/bouton-synchro";
 import { type BrouillonRegle, EditeurRegle, REGLE_VIDE } from "@/components/mails/editeur-regle";
 import { SelecteurArticle } from "@/components/selecteur-article";
@@ -16,7 +17,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/api";
 import { formatDateHeure } from "@/lib/format";
-import { useInvaliderStock } from "@/lib/queries";
+import { useComptes, useInvaliderStock } from "@/lib/queries";
 import { TYPES_EMAIL } from "@/lib/statuts";
 import type { EmailDetail, EmailResume, StatutTraitement, TypeEmail } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -89,6 +90,12 @@ function DetailMail({ id, fermer }: { id: number; fermer: () => void }) {
       <dl className="grid grid-cols-[110px_1fr] gap-x-3 gap-y-1.5 text-sm">
         <dt className="text-muted-foreground">De</dt>
         <dd className="truncate">{m.expediteur}</dd>
+        {m.compte && (
+          <>
+            <dt className="text-muted-foreground">Compte</dt>
+            <dd>{m.compte}</dd>
+          </>
+        )}
         <dt className="text-muted-foreground">Reçu le</dt>
         <dd>{formatDateHeure(m.date)}</dd>
         <dt className="text-muted-foreground">Type</dt>
@@ -212,11 +219,14 @@ function DetailMail({ id, fermer }: { id: number; fermer: () => void }) {
 export default function PageMails() {
   const [onglet, setOnglet] = useState<Onglet>("a_classer");
   const [ouvert, setOuvert] = useState<number | null>(null);
+  const [compte, setCompte] = useState("tous");
+  const { data: comptes } = useComptes();
+  const plusieursComptes = (comptes?.length ?? 0) > 1;
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["emails", onglet],
+    queryKey: ["emails", onglet, compte],
     queryFn: () =>
       api<{ items: EmailResume[]; total: number; compteurs: Record<string, number> }>("/emails", {
-        params: { ...FILTRES[onglet], taille_page: 100 },
+        params: { ...FILTRES[onglet], compte: compte === "tous" ? undefined : compte, taille_page: 100 },
       }),
   });
   const compteurs = data?.compteurs ?? {};
@@ -228,15 +238,32 @@ export default function PageMails() {
         description="Mails Vinted lus dans ta boîte (jamais modifiés ni marqués comme lus)"
         actions={<BoutonSynchro />}
       />
-      <Tabs value={onglet} onValueChange={(v) => setOnglet(v as Onglet)} className="mb-4">
-        <TabsList>
-          <TabsTrigger value="a_classer">
-            Non classés {!!compteurs.a_classer && <span className="ml-1 tabular-nums">({compteurs.a_classer})</span>}
-          </TabsTrigger>
-          <TabsTrigger value="a_rattacher">À rattacher</TabsTrigger>
-          <TabsTrigger value="tous">Tous</TabsTrigger>
-        </TabsList>
-      </Tabs>
+      <div className="mb-4 flex flex-wrap items-center gap-3">
+        <Tabs value={onglet} onValueChange={(v) => setOnglet(v as Onglet)}>
+          <TabsList>
+            <TabsTrigger value="a_classer">
+              Non classés {!!compteurs.a_classer && <span className="ml-1 tabular-nums">({compteurs.a_classer})</span>}
+            </TabsTrigger>
+            <TabsTrigger value="a_rattacher">À rattacher</TabsTrigger>
+            <TabsTrigger value="tous">Tous</TabsTrigger>
+          </TabsList>
+        </Tabs>
+        {plusieursComptes && (
+          <Select value={compte} onValueChange={setCompte}>
+            <SelectTrigger size="sm" className="w-48" aria-label="Compte Vinted">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="tous">Tous les comptes</SelectItem>
+              {comptes?.map((c) => (
+                <SelectItem key={c.id} value={String(c.id)}>
+                  {c.nom}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
 
       {error ? (
         <MessageErreur erreur={error} reessayer={() => refetch()} />
@@ -269,6 +296,7 @@ export default function PageMails() {
                   <span className="block truncate text-sm font-medium">{m.sujet || "(sans sujet)"}</span>
                   <span className="block truncate text-xs text-muted-foreground">{m.extrait}</span>
                 </span>
+                {plusieursComptes && <BadgeCompte nom={m.compte} />}
                 <span
                   className={cn(
                     "w-fit shrink-0 rounded-full px-2 py-0.5 text-xs font-medium",

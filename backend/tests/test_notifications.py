@@ -145,10 +145,18 @@ def test_rappel_de_9h(db: Session, envois: list[dict[str, Any]], monkeypatch: py
 
 def test_sauvegarde_complete_sans_secrets(client: TestClient, db: Session) -> None:
     from app.api.deps import get_parametres
+    from app.models import CompteVinted
     from app.services import crypto
 
-    p = get_parametres(db)
-    p.imap_mot_de_passe_chiffre = crypto.chiffrer("secret-imap")
+    get_parametres(db)
+    db.add(
+        CompteVinted(
+            nom="Perso",
+            imap_serveur="imap.gmail.com",
+            imap_email="moi@gmail.com",
+            imap_mot_de_passe_chiffre=crypto.chiffrer("secret-imap"),
+        )
+    )
     db.add(Article(nom="Pull", prix_achat_net=D("10")))
     db.commit()
     client.post(
@@ -165,7 +173,8 @@ def test_sauvegarde_complete_sans_secrets(client: TestClient, db: Session) -> No
     base = json.loads(z.read("base.json"))
     assert base["article"][0]["nom"] == "Pull"
     assert "mot_de_passe_hash" not in base["utilisateur"][0]
-    assert "imap_mot_de_passe_chiffre" not in base["parametres"][0]
+    assert base["compte_vinted"][0]["imap_email"] == "moi@gmail.com"
+    assert "imap_mot_de_passe_chiffre" not in base["compte_vinted"][0]
     assert "session_utilisateur" not in base
 
 

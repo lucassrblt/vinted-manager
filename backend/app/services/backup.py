@@ -19,7 +19,7 @@ from app.services.stats import tz
 # Jamais dans la sauvegarde : secrets et données de session.
 COLONNES_EXCLUES = {
     "utilisateur": {"mot_de_passe_hash"},
-    "parametres": {"imap_mot_de_passe_chiffre"},
+    "compte_vinted": {"imap_mot_de_passe_chiffre"},
 }
 TABLES_EXCLUES = {"session_utilisateur", "tentative_connexion"}
 

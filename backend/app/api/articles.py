@@ -6,7 +6,7 @@ from sqlalchemy.orm import selectinload
 
 from app.api.deps import Db, get_parametres
 from app.db import utcnow
-from app.models import Article, Batch, EmailVinted, Envoi, HistoriqueStatut, PreuveAchat, Vente
+from app.models import Article, Batch, CompteVinted, EmailVinted, Envoi, HistoriqueStatut, PreuveAchat, Vente
 from app.models.enums import StatutArticle
 from app.schemas.stock import (
     ActionGroupee,
@@ -46,6 +46,11 @@ def _get(db: Db, article_id: int) -> Article:
     return article
 
 
+def _verifier_compte(db: Db, compte_id: int | None) -> None:
+    if compte_id is not None and db.get(CompteVinted, compte_id) is None:
+        raise HTTPException(422, "Compte Vinted introuvable.")
+
+
 def _filtrer(
     q: Select[Article],
     statut: list[StatutArticle] | None,
@@ -54,11 +59,14 @@ def _filtrer(
     categorie: list[str] | None,
     taille: list[str] | None,
     recherche: str | None,
+    compte_id: list[int] | None = None,
 ) -> Select[Article]:
     if statut:
         q = q.where(Article.statut.in_([s.value for s in statut]))
     if batch_id:
         q = q.where(Article.batch_id.in_(batch_id))
+    if compte_id:
+        q = q.where(Article.compte_id.in_(compte_id))
     if marque:
         q = q.where(Article.marque.in_(marque))
     if categorie:
@@ -83,6 +91,7 @@ def lister(
     db: Db,
     statut: list[StatutArticle] | None = Query(None),
     batch_id: list[int] | None = Query(None),
+    compte_id: list[int] | None = Query(None),
     marque: list[str] | None = Query(None),
     categorie: list[str] | None = Query(None),
     taille: list[str] | None = Query(None),
@@ -92,7 +101,7 @@ def lister(
     page: int = Query(1, ge=1),
     taille_page: int = Query(50, ge=1, le=500),
 ) -> Page[ArticleOut]:
-    base = _filtrer(select(Article), statut, batch_id, marque, categorie, taille, q)
+    base = _filtrer(select(Article), statut, batch_id, marque, categorie, taille, q, compte_id)
     total = db.scalar(select(func.count()).select_from(base.subquery())) or 0
     colonne = TRIS.get(tri, Article.created_at)
     colonne = colonne.asc().nulls_last() if ordre == "asc" else colonne.desc().nulls_last()
@@ -136,6 +145,7 @@ def creer(data: ArticleCreate, db: Db) -> ArticleOut:
         article.prix_achat_brut = article.prix_achat_net + data.remise
     if data.batch_id is not None and db.get(Batch, data.batch_id) is None:
         raise HTTPException(422, "Batch introuvable.")
+    _verifier_compte(db, data.compte_id)
     db.add(article)
     changer_statut(db, article, data.statut, commentaire="Création")
     db.commit()
@@ -154,6 +164,7 @@ def modifier(article_id: int, data: ArticleUpdate, db: Db) -> ArticleOut:
     champs = data.model_dump(exclude_unset=True)
     if "batch_id" in champs and champs["batch_id"] is not None and db.get(Batch, champs["batch_id"]) is None:
         raise HTTPException(422, "Batch introuvable.")
+    _verifier_compte(db, champs.get("compte_id"))
     for cle, valeur in champs.items():
         setattr(article, cle, valeur)
     # Brut ou remise modifiés sans net explicite : on recalcule le net.
@@ -261,6 +272,10 @@ def actions_groupees(data: ActionGroupee, db: Db) -> dict[str, int]:
             raise HTTPException(422, "Batch introuvable.")
         for a in articles:
             a.batch_id = data.batch_id
+    elif data.action == "compte":
+        _verifier_compte(db, data.compte_id)
+        for a in articles:
+            a.compte_id = data.compte_id
     elif data.action == "supprimer":
         for a in articles:
             for preuve in db.scalars(select(PreuveAchat).where(PreuveAchat.article_id == a.id)):

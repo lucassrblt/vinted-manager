@@ -6,6 +6,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 
 import { EnTetePage, EtatVide, LignesSquelette, MessageErreur, StatutBadge } from "@/components/commun";
+import { BadgeCompte } from "@/components/badge-compte";
 import { SelecteurArticle } from "@/components/selecteur-article";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
@@ -84,8 +85,9 @@ export default function PageVentes() {
               <li key={v.email_id} className="rounded-xl border bg-card p-4">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="font-medium">
+                    <p className="flex flex-wrap items-center gap-2 font-medium">
                       {v.donnees.titre_article ? `« ${v.donnees.titre_article} »` : v.sujet}
+                      <BadgeCompte nom={v.compte} />
                     </p>
                     <p className="text-sm text-muted-foreground tabular-nums">
                       {[

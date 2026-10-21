@@ -18,8 +18,8 @@ planificateur: BackgroundScheduler | None = None
 def tache_synchro() -> None:
     with SessionLocal() as db:
         params = db.get(Parametres, 1)
-        if params is None or not imap_sync.imap_configuree(params):
-            return  # boîte mail non configurée : rien à faire
+        if params is None or not imap_sync.comptes_actifs(db):
+            return  # aucune boîte mail configurée : rien à faire
         try:
             imap_sync.synchroniser(db, params)
         except imap_sync.ErreurImap as exc:

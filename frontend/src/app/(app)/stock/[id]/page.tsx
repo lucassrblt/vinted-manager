@@ -32,7 +32,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { api, telecharger } from "@/lib/api";
 import { formatCoefficient, formatDate, formatDateHeure, formatDelai, formatEuros, formatPourcent } from "@/lib/format";
-import { useArticle, useBatches, useChangerStatut, useInvaliderStock, useModifierArticle } from "@/lib/queries";
+import {
+  useArticle,
+  useBatches,
+  useChangerStatut,
+  useComptes,
+  useInvaliderStock,
+  useModifierArticle,
+} from "@/lib/queries";
 import { ETATS, ORDRE_STATUTS, STATUTS } from "@/lib/statuts";
 import type { Article, Historique, LiensArticle } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -73,6 +80,7 @@ export default function FicheArticle() {
   const router = useRouter();
   const { data: a, isLoading, error, refetch } = useArticle(id);
   const { data: batches } = useBatches();
+  const { data: comptes } = useComptes();
   const timeline = useQuery({
     queryKey: ["timeline", id],
     queryFn: () => api<Historique[]>(`/articles/${id}/timeline`),
@@ -306,6 +314,30 @@ export default function FicheArticle() {
                     </SelectContent>
                   </Select>
                 </Ligne>
+                {!!comptes?.length && (
+                  <Ligne libelle="Compte Vinted">
+                    <Select
+                      value={a.compte_id ? String(a.compte_id) : "aucun"}
+                      onValueChange={(v) => sauver("compte_id", v === "aucun" ? null : v)}
+                    >
+                      <SelectTrigger
+                        size="sm"
+                        className="h-7 w-full border-transparent px-1.5 shadow-none hover:bg-muted"
+                        aria-label="Compte Vinted"
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="aucun">Pas encore attribué</SelectItem>
+                        {comptes.map((c) => (
+                          <SelectItem key={c.id} value={String(c.id)}>
+                            {c.nom}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Ligne>
+                )}
                 <Ligne libelle="Date d'achat">
                   <span className="tabular-nums">{formatDate(a.date_achat)}</span>
                 </Ligne>

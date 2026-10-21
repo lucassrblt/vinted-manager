@@ -14,11 +14,12 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import utcnow
 from app.logging import log
-from app.models import Parametres, SyncLog
+from app.models import CompteVinted, Parametres, SyncLog
 from app.services import crypto
 from app.services.email_parser import lire_mail
 from app.services.notifications import annuler_en_attente
@@ -57,20 +58,23 @@ def _client_ssl(serveur: str, port: int) -> imaplib.IMAP4_SSL:
     return imaplib.IMAP4_SSL(serveur, port, timeout=TIMEOUT_SECONDES)
 
 
-def imap_configuree(params: Parametres) -> bool:
-    """La boîte est-elle configurée ? (sans déchiffrer le mot de passe)"""
-    return bool(params.imap_serveur and params.imap_email and params.imap_mot_de_passe_chiffre)
+def comptes_actifs(db: Session) -> list[CompteVinted]:
+    return list(
+        db.scalars(select(CompteVinted).where(CompteVinted.actif.is_(True)).order_by(CompteVinted.id))
+    )
 
 
-def config_depuis(params: Parametres) -> ConfigImap | None:
-    if not (params.imap_serveur and params.imap_email and params.imap_mot_de_passe_chiffre):
-        return None
+def noms_comptes(db: Session) -> dict[int, str]:
+    return {c.id: c.nom for c in db.scalars(select(CompteVinted))}
+
+
+def config_depuis(compte: CompteVinted) -> ConfigImap:
     return ConfigImap(
-        serveur=params.imap_serveur,
-        port=params.imap_port or 993,
-        email=params.imap_email,
-        mot_de_passe=crypto.dechiffrer(params.imap_mot_de_passe_chiffre),
-        dossier=params.imap_dossier or "INBOX",
+        serveur=compte.imap_serveur,
+        port=compte.imap_port or 993,
+        email=compte.imap_email,
+        mot_de_passe=crypto.dechiffrer(compte.imap_mot_de_passe_chiffre),
+        dossier=compte.imap_dossier or "INBOX",
     )
 
 
@@ -84,6 +88,8 @@ def _message_erreur(exc: Exception, cfg: ConfigImap) -> str:
     if isinstance(exc, ssl.SSLError):
         return "Erreur de connexion sécurisée (SSL) : le port doit être 993 avec une connexion SSL."
     if isinstance(exc, imaplib.IMAP4.error):
+        if gmail and "Lookup failed" in texte:
+            return f"Gmail ne connaît pas l'adresse {cfg.email} : vérifie qu'elle est bien écrite."
         if gmail and (
             "Application-specific password" in texte
             or "AUTHENTICATIONFAILED" in texte
@@ -150,22 +156,41 @@ def critere_expediteurs(expediteurs: list[str]) -> str:
     return critere
 
 
-def synchroniser(db: Session, params: Parametres, fabrique: FabriqueClient = _client_ssl) -> SyncLog:
+def synchroniser(db: Session, params: Parametres, fabrique: FabriqueClient = _client_ssl) -> list[SyncLog]:
+    """Synchronise toutes les boîtes actives, l'une après l'autre (un journal par boîte)."""
     if not _verrou.acquire(blocking=False):
         raise ErreurImap("Une synchronisation est déjà en cours.")
-    journal = SyncLog(debut=utcnow(), nb_mails=0)
+    try:
+        comptes = comptes_actifs(db)
+        if not comptes:
+            journal = SyncLog(
+                debut=utcnow(),
+                fin=utcnow(),
+                nb_mails=0,
+                erreur="Aucune boîte mail configurée (Paramètres → Mails).",
+            )
+            db.add(journal)
+            db.commit()
+            return [journal]
+        return [_synchroniser_compte(db, params, c, fabrique) for c in comptes]
+    finally:
+        _verrou.release()
+
+
+def _synchroniser_compte(
+    db: Session, params: Parametres, compte: CompteVinted, fabrique: FabriqueClient
+) -> SyncLog:
+    journal = SyncLog(debut=utcnow(), nb_mails=0, compte_id=compte.id)
     db.add(journal)
     db.commit()
     # Compteurs locaux : un rollback (mail en erreur) ne doit pas les remettre à zéro.
     nouveaux = 0
     erreur: str | None = None
     try:
-        cfg = config_depuis(params)
-        if cfg is None:
-            raise ErreurImap("La boîte mail n'est pas configurée (Paramètres → Mails).")
+        cfg = config_depuis(compte)
         depuis = (
-            (params.derniere_synchro - timedelta(days=1))
-            if params.derniere_synchro
+            (compte.derniere_synchro - timedelta(days=1))
+            if compte.derniere_synchro
             else (utcnow() - timedelta(days=PREMIERE_SYNCHRO_JOURS))
         )
         client = _ouvrir(cfg, fabrique)
@@ -184,7 +209,7 @@ def synchroniser(db: Session, params: Parametres, fabrique: FabriqueClient = _cl
                     brut = next((c[1] for c in contenu if isinstance(c, tuple) and len(c) > 1), None)
                     if statut != "OK" or not isinstance(brut, bytes):
                         continue
-                    if enregistrer_mail(db, lire_mail(brut)) is not None:
+                    if enregistrer_mail(db, lire_mail(brut), compte_id=compte.id) is not None:
                         nouveaux += 1
                 except Exception as exc:  # un mail illisible ne bloque pas les autres
                     db.rollback()
@@ -195,7 +220,7 @@ def synchroniser(db: Session, params: Parametres, fabrique: FabriqueClient = _cl
                     )
         finally:
             _fermer(client)
-        params.derniere_synchro = journal.debut
+        compte.derniere_synchro = journal.debut
         erreur = "\n".join(erreurs[:20]) or None
     except (ErreurImap, crypto.CleManquante) as exc:
         db.rollback()
@@ -206,6 +231,5 @@ def synchroniser(db: Session, params: Parametres, fabrique: FabriqueClient = _cl
         journal.fin = utcnow()
         db.add(journal)
         db.commit()
-        _verrou.release()
-    log.info("sync_imap", nb_mails=journal.nb_mails, erreur=bool(journal.erreur))
+    log.info("sync_imap", compte=compte.id, nb_mails=journal.nb_mails, erreur=bool(journal.erreur))
     return journal

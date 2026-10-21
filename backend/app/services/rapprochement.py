@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from rapidfuzz import fuzz
-from sqlalchemy import select
+from sqlalchemy import Select, or_, select
 from sqlalchemy.orm import Session
 
 from app.models import Article
@@ -42,8 +42,19 @@ def score_titre(titre: str, article: Article) -> float:
     )
 
 
-def candidats(db: Session, titre: str | None, prix: Decimal | None) -> list[Candidat]:
-    articles = db.scalars(select(Article).where(Article.statut == StatutArticle.EN_LIGNE)).all()
+def du_compte(requete: Select[Article], compte_id: int | None) -> Select[Article]:
+    """Limite aux articles de ce compte Vinted (ou pas encore attribués à un compte)."""
+    if compte_id is None:
+        return requete
+    return requete.where(or_(Article.compte_id.is_(None), Article.compte_id == compte_id))
+
+
+def candidats(
+    db: Session, titre: str | None, prix: Decimal | None, compte_id: int | None = None
+) -> list[Candidat]:
+    articles = db.scalars(
+        du_compte(select(Article).where(Article.statut == StatutArticle.EN_LIGNE), compte_id)
+    ).all()
     resultat = []
     for a in articles:
         score = score_titre(titre, a) if titre else 0.0

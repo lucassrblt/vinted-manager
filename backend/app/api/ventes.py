@@ -14,6 +14,7 @@ from app.db import utcnow
 from app.models import Article, EmailVinted, Envoi, Vente
 from app.models.enums import StatutArticle, StatutEnvoi, StatutTraitementEmail, TypeEmail
 from app.services import bordereaux, rapprochement, storage, traitement
+from app.services.imap_sync import noms_comptes
 
 router = APIRouter(tags=["ventes"])
 
@@ -32,16 +33,19 @@ def ventes_a_confirmer(db: Db) -> list[dict[str, Any]]:
         .order_by(EmailVinted.date.desc())
     ).all()
     resultat = []
+    comptes = noms_comptes(db)
     for e in emails:
         d = e.donnees_extraites or {}
         prix = Decimal(d["prix"]) if d.get("prix") else None
+        candidats = rapprochement.candidats(db, d.get("titre_article"), prix, compte_id=e.compte_id)
         resultat.append(
             {
                 "email_id": e.id,
                 "date": e.date,
                 "sujet": e.sujet,
+                "compte": comptes.get(e.compte_id) if e.compte_id else None,
                 "donnees": d,
-                "candidats": [c.__dict__ for c in rapprochement.candidats(db, d.get("titre_article"), prix)],
+                "candidats": [c.__dict__ for c in candidats],
             }
         )
     return resultat

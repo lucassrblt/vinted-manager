@@ -180,6 +180,21 @@ Coût estimé : **~0,05 $ par article** (4 photos), soit ~5 $ pour 100 articles,
 - **Article de test** « Hoodie Adidas Originals - gris (test photos) » créé en local : à supprimer.
 - `httpx` passé en dépendance de production (il manquait dans l'image Docker : attrapé au premier démarrage).
 
+## Plusieurs comptes Vinted (ajout du 21/10/2026) ✅
+
+### Fait
+- **Une boîte mail par compte Vinted** (Paramètres → Mails) : ajout, modification, test de connexion, pause et débranchement. La boîte déjà configurée devient « Compte 1 » à la migration.
+- **Synchro** : toutes les boîtes actives, l'une après l'autre, avec un journal par boîte.
+- **Mails** : chaque mail garde le compte qui l'a reçu (badge et filtre dans Mails, badge dans Ventes à confirmer).
+- **Articles** : champ « Compte Vinted » (fiche, création, action groupée, filtre du stock).
+- **Rapprochement** : une vente reçue sur un compte n'est rapprochée qu'avec les articles de ce compte ou ceux pas encore attribués. Une vente confirmée attribue le compte à l'article.
+
+### Décisions prises
+- Le filtre et les badges n'apparaissent qu'à partir de 2 comptes, pour ne pas charger l'écran avec un seul compte.
+- Débrancher une boîte conserve ses mails, ventes et articles (le lien vers le compte est retiré).
+- Les expéditeurs Vinted lus restent communs à toutes les boîtes.
+- La compta reste globale (pas de découpage par compte pour l'instant).
+
 ## État général
 
 Les 4 étapes du cahier des charges sont faites. Ce qui reste à valider avec tes vraies données :
