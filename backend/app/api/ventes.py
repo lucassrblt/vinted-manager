@@ -9,12 +9,14 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 from sqlalchemy import select
 
+from app.api import creation
 from app.api.deps import Db
 from app.db import utcnow
 from app.models import Article, EmailVinted, Envoi, Vente
 from app.models.enums import StatutArticle, StatutEnvoi, StatutTraitementEmail, TypeEmail
 from app.services import bordereaux, rapprochement, storage, traitement
 from app.services.imap_sync import noms_comptes
+from app.services.statuts import changer_statut
 
 router = APIRouter(tags=["ventes"])
 
@@ -53,6 +55,37 @@ def ventes_a_confirmer(db: Db) -> list[dict[str, Any]]:
             }
         )
     return resultat
+
+
+class PiecePersoIn(BaseModel):
+    email_id: int
+
+
+@router.post("/ventes/piece-perso")
+def vente_piece_perso(data: PiecePersoIn, db: Db) -> dict[str, Any]:
+    """Vente d'une de tes propres pièces, absente du stock : l'article est créé depuis le mail
+    (coût 0 €), puis la vente est confirmée et ses mails de suivi appliqués."""
+    email = db.get(EmailVinted, data.email_id)
+    if email is None or email.type_detecte != TypeEmail.VENTE:
+        raise HTTPException(404, "Mail de vente introuvable.")
+    if email.vente_id:
+        raise HTTPException(409, "Cette vente est déjà confirmée.")
+    d = email.donnees_extraites or {}
+    titre = str(d.get("titre_article") or email.sujet or "Pièce perso")[:255]
+    article = Article(nom=titre, titre_annonce=titre[:120], compte_id=email.compte_id)
+    creation.marquer_perso(article)
+    db.add(article)
+    changer_statut(
+        db,
+        article,
+        StatutArticle.EN_LIGNE,
+        quand=email.date,
+        commentaire="Pièce perso (depuis le mail de vente)",
+    )
+    db.flush()
+    vente = traitement.confirmer_vente(db, email, article, auto=False)
+    db.commit()
+    return {"vente_id": vente.id, "article_id": article.id}
 
 
 class ConfirmerIn(BaseModel):

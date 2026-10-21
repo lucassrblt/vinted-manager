@@ -23,6 +23,7 @@ class ArticleBase(BaseModel):
     prix_vente_reel: Decimal | None = Field(default=None, ge=0)
     batch_id: int | None = None
     compte_id: int | None = None
+    perso: bool = False
     source: str | None = None
     date_achat: date | None = None
     notes: str | None = None
@@ -50,6 +51,7 @@ class ArticleUpdate(BaseModel):
     prix_vente_reel: Decimal | None = Field(default=None, ge=0)
     batch_id: int | None = None
     compte_id: int | None = None
+    perso: bool | None = None
     source: str | None = None
     date_achat: date | None = None
     date_publication: datetime | None = None
@@ -83,6 +85,7 @@ class ArticleOut(BaseModel):
     batch_id: int | None
     batch_nom: str | None = None
     compte_id: int | None
+    perso: bool
     source: str | None
     date_achat: date | None
     date_reception: datetime | None

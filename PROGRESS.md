@@ -201,6 +201,23 @@ Coût estimé : **~0,05 $ par article** (4 photos), soit ~5 $ pour 100 articles,
 - Les expéditeurs Vinted lus restent communs à toutes les boîtes.
 - La compta reste globale (pas de découpage par compte pour l'instant).
 
+## Nouvelle annonce depuis les photos (ajout du 21/10/2026) ✅
+
+### Fait
+- **Stock → Nouvelle annonce** : on dépose toutes les photos de l'article (12 max, dans n'importe quel ordre).
+- **Une seule requête à Claude (vision)** : type de chaque photo (devant, dos, étiquette, logo, défaut, détail), fiche lue sur l'étiquette (marque, taille, matière), catégorie, couleur, état, défauts visibles, titre, description, mots-clés et prix estimé. Environ 5 à 10 s.
+- **Retouche des photos lancée aussitôt** en tâche de fond (sauf les photos de défaut, jamais retouchées).
+- **Style du vendeur** : description de 2-3 lignes simples (exemples fournis), titres calés sur les vrais titres Vinted vendus (mails), prix calé sur les vraies ventes. Consignes communes dans `prompts/style_annonce.txt`.
+- **Provenance** : article déjà au stock (suggestions par marque, taille et ressemblance ; l'annonce fusionne avec lui), nouvel article d'un batch (avec prix d'achat), ou **pièce perso** (achat 0 €, hors batchs).
+- **Éditeur** : « Autre titre », « Autre version », « Plus court » ne régénèrent que la partie demandée ; copie du titre et de la description ; « Télécharger pour Vinted » (photos numérotées dans l'ordre) ; « Publié sur Vinted ».
+- **Ventes à confirmer → Pièce perso** : crée l'article depuis le mail (0 € d'achat), confirme la vente et applique ses mails de suivi.
+
+### Décisions prises
+- Le prix de l'IA ne sert que s'il n'y a pas assez de ventes comparables : il est affiché comme « Proposé par l'IA ».
+- La provenance est demandée avant « Publié sur Vinted » pour qu'aucune marge ne soit faussée.
+- Pièce perso : coût 0 €, donc toute la vente est de la marge ; elle reste dans le CA et la compta (pas encore séparée dans l'export URSSAF : à décider).
+- Vinted n'a pas d'API de publication : la mise en ligne reste un copier-coller, réduit au minimum.
+
 ## État général
 
 Les 4 étapes du cahier des charges sont faites. Ce qui reste à valider avec tes vraies données :

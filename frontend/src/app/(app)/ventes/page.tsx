@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, Receipt, Sparkles, Undo2, X } from "lucide-react";
+import { Check, Receipt, Shirt, Sparkles, Undo2, X } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -59,6 +59,14 @@ export default function PageVentes() {
       toast.success("Mail ignoré");
     },
   });
+  const perso = useMutation({
+    mutationFn: (emailId: number) => api("/ventes/piece-perso", { body: { email_id: emailId } }),
+    onSuccess: () => {
+      invalider();
+      toast.success("Pièce perso ajoutée (0 € d'achat) et vente confirmée");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
   const annuler = useMutation({
     mutationFn: (venteId: number) => api(`/ventes/${venteId}/annuler`, { method: "POST" }),
     onSuccess: () => {
@@ -115,9 +123,20 @@ export default function PageVentes() {
                         .join(" · ")}
                     </p>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => ignorer.mutate(v.email_id)}>
-                    <X /> Ignorer
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={perso.isPending}
+                      onClick={() => perso.mutate(v.email_id)}
+                      title="Une de tes affaires, absente du stock : l'article est créé à 0 € d'achat"
+                    >
+                      <Shirt /> Pièce perso
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => ignorer.mutate(v.email_id)}>
+                      <X /> Ignorer
+                    </Button>
+                  </div>
                 </div>
                 <div className="mt-3 space-y-1.5">
                   {v.candidats.map((c, i) => (

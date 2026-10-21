@@ -6,6 +6,7 @@ import {
   FileSpreadsheet,
   Filter,
   Home,
+  ImagePlus,
   Inbox,
   Layers,
   type LucideIcon,
@@ -36,6 +37,7 @@ export const NAVIGATION: { groupe?: string; liens: LienNav[] }[] = [
   {
     groupe: "Stock",
     liens: [
+      { href: "/annonces/nouvelle", libelle: "Nouvelle annonce", icone: ImagePlus },
       { href: "/stock", libelle: "Articles", icone: Boxes },
       { href: "/annonces", libelle: "Annonces", icone: Megaphone },
       { href: "/batches", libelle: "Batches", icone: Layers },
@@ -54,6 +56,13 @@ export const NAVIGATION: { groupe?: string; liens: LienNav[] }[] = [
   },
 ];
 
-export function estActif(pathname: string, href: string): boolean {
+function correspond(pathname: string, href: string): boolean {
   return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
+}
+
+const HREFS = NAVIGATION.flatMap((g) => g.liens.map((l) => l.href));
+
+/** Lien actif : le plus précis qui correspond (« /annonces/nouvelle » n'allume pas « /annonces »). */
+export function estActif(pathname: string, href: string): boolean {
+  return correspond(pathname, href) && !HREFS.some((h) => h.length > href.length && correspond(pathname, h));
 }

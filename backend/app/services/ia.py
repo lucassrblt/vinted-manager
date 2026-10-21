@@ -6,15 +6,18 @@
 - IA_FACTICE=true : réponses déterministes sans appel réseau (démo, tests de bout en bout).
 """
 
+import base64
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import anthropic
+from anthropic.types import MessageParam
 from pydantic import BaseModel, ValidationError
 
 from app.config import get_settings
 from app.logging import log
+from app.services import images
 
 DOSSIER_PROMPTS = Path(__file__).resolve().parent.parent / "prompts"
 TITRE_MAX = 60
@@ -54,7 +57,12 @@ SCHEMA_REPONSE = {
 
 
 def prompt_systeme(nom: str) -> str:
-    return (DOSSIER_PROMPTS / f"{nom}.txt").read_text(encoding="utf-8").strip()
+    texte = (DOSSIER_PROMPTS / f"{nom}.txt").read_text(encoding="utf-8").strip()
+    if "{style}" in texte:  # consignes de style communes à la rédaction et à l'analyse des photos
+        texte = texte.replace(
+            "{style}", (DOSSIER_PROMPTS / "style_annonce.txt").read_text(encoding="utf-8").strip()
+        )
+    return texte
 
 
 def _client() -> anthropic.Anthropic:
@@ -90,14 +98,14 @@ def _message_erreur(exc: anthropic.APIError) -> str:
     return "La demande à l'IA a échoué. Réessaie, et si le problème continue, vérifie la configuration."
 
 
-def _appeler(systeme: str, contenu: str, schema: dict[str, Any]) -> dict[str, Any]:
+def _appeler(systeme: str, contenu: str | list[dict[str, Any]], schema: dict[str, Any]) -> dict[str, Any]:
     client = _client()
     try:
         reponse = client.messages.create(
             model=get_settings().anthropic_model,
             max_tokens=MAX_TOKENS,
             system=systeme,
-            messages=[{"role": "user", "content": contenu}],
+            messages=[cast(MessageParam, {"role": "user", "content": contenu})],
             # Tâche de rédaction courte : effort bas, sortie JSON imposée par le schéma.
             output_config={"effort": "low", "format": {"type": "json_schema", "schema": schema}},
         )
@@ -144,7 +152,9 @@ def _fiche_texte(fiche: dict[str, Any]) -> str:
     return "\n".join(lignes)
 
 
-def generer_annonce(fiche: dict[str, Any], modele: dict[str, str | None] | None, essai: int = 0) -> AnnonceIA:
+def generer_annonce(
+    fiche: dict[str, Any], modele: dict[str, str | None] | None, essai: int = 0, consigne: str | None = None
+) -> AnnonceIA:
     if get_settings().ia_factice:
         return _annonce_factice(fiche)
     contenu = "Fiche de l'article (seules informations fiables) :\n" + _fiche_texte(fiche)
@@ -159,6 +169,8 @@ def generer_annonce(fiche: dict[str, Any], modele: dict[str, str | None] | None,
                 contenu += f"\n- {libelle} : {modele[cle]}"
     if essai:
         contenu += f"\n\nProposition n°{essai + 1} : formule-la différemment des précédentes."
+    if consigne:
+        contenu += f"\n\nConsigne : {consigne}"
     try:
         annonce = AnnonceIA.model_validate(
             _appeler(prompt_systeme("annonce_systeme"), contenu, SCHEMA_ANNONCE)
@@ -180,6 +192,129 @@ def _annonce_factice(fiche: dict[str, Any]) -> AnnonceIA:
     description += " N'hésite pas si tu as une question. Possibilité de faire un lot."
     mots = [str(m).lower() for m in morceaux if m]
     return AnnonceIA(titre=titre, description=description, mots_cles=mots)
+
+
+# --- Analyse des photos -----------------------------------------------------------------------
+
+TYPES_PHOTO = ["devant", "dos", "etiquette", "logo", "detail", "defaut"]
+ETATS = ["neuf_avec_etiquette", "neuf_sans_etiquette", "tres_bon_etat", "bon_etat", "satisfaisant"]
+TAILLE_IMAGE_IA = 1024  # px : suffisant pour lire une étiquette, peu de tokens
+
+
+class AnalysePhotos(BaseModel):
+    types: list[str]
+    marque: str | None
+    modele: str | None
+    categorie: str | None
+    taille: str | None
+    couleur: str | None
+    etat: str | None
+    matiere: str | None
+    defauts: str | None
+    titre: str
+    description: str
+    mots_cles: list[str]
+    prix_estime: float | None = None
+
+
+def _nullable(description: str) -> dict[str, Any]:
+    return {"anyOf": [{"type": "string"}, {"type": "null"}], "description": description}
+
+
+SCHEMA_ANALYSE = {
+    "type": "object",
+    "properties": {
+        "types": {"type": "array", "items": {"type": "string", "enum": TYPES_PHOTO}},
+        "marque": _nullable("telle qu'écrite sur l'étiquette"),
+        "modele": _nullable("modèle évident, sinon null"),
+        "categorie": _nullable("type de pièce"),
+        "taille": _nullable("telle qu'écrite sur l'étiquette"),
+        "couleur": _nullable("couleur principale"),
+        "etat": {"anyOf": [{"type": "string", "enum": ETATS}, {"type": "null"}]},
+        "matiere": _nullable("composition lue sur l'étiquette"),
+        "defauts": _nullable("défauts visibles"),
+        "titre": {"type": "string"},
+        "description": {"type": "string"},
+        "mots_cles": {"type": "array", "items": {"type": "string"}},
+        "prix_estime": {
+            "anyOf": [{"type": "number"}, {"type": "null"}],
+            "description": "prix de mise en ligne réaliste sur Vinted, en euros",
+        },
+    },
+    "required": [
+        "prix_estime",
+        "types",
+        "marque",
+        "modele",
+        "categorie",
+        "taille",
+        "couleur",
+        "etat",
+        "matiere",
+        "defauts",
+        "titre",
+        "description",
+        "mots_cles",
+    ],  # fmt: skip
+    "additionalProperties": False,
+}
+
+
+def analyser_photos(photos: list[bytes], exemples: list[str] | None = None) -> AnalysePhotos:
+    """Une seule requête : type de chaque photo, fiche lue sur l'étiquette et les photos, annonce."""
+    if get_settings().ia_factice:
+        return _analyse_factice(len(photos))
+    contenu: list[dict[str, Any]] = []
+    for i, photo in enumerate(photos):
+        reduite = images.preparer(photo, taille_max=TAILLE_IMAGE_IA)
+        contenu.append({"type": "text", "text": f"Photo {i} :"})
+        contenu.append(
+            {
+                "type": "image",
+                "source": {
+                    "type": "base64",
+                    "media_type": "image/jpeg",
+                    "data": base64.standard_b64encode(reduite).decode("ascii"),
+                },
+            }
+        )
+    consigne = f"{len(photos)} photos. Donne exactement {len(photos)} types, dans l'ordre."
+    if exemples:
+        consigne += "\nDernières ventes du vendeur (format des titres et niveau de prix) :\n" + "\n".join(
+            f"- {t}" for t in exemples
+        )
+    contenu.append({"type": "text", "text": consigne})
+    try:
+        analyse = AnalysePhotos.model_validate(
+            _appeler(prompt_systeme("analyse_photos"), contenu, SCHEMA_ANALYSE)
+        )
+    except ValidationError as exc:
+        raise ErreurIA("Réponse de l'IA incomplète. Réessaie.") from exc
+    analyse.types = (analyse.types + ["detail"] * len(photos))[: len(photos)]
+    analyse.titre = couper_titre(analyse.titre)
+    analyse.mots_cles = [m.strip().lstrip("#").lower() for m in analyse.mots_cles if m.strip()][:8]
+    if analyse.prix_estime is not None and not 1 <= analyse.prix_estime <= 2000:
+        analyse.prix_estime = None
+    return analyse
+
+
+def _analyse_factice(nb: int) -> AnalysePhotos:
+    types = (["devant", "dos", "etiquette", "logo"] + ["detail"] * nb)[:nb]
+    return AnalysePhotos(
+        types=types,
+        marque="Ralph Lauren",
+        modele=None,
+        categorie="Sweat demi-zip",
+        taille="M",
+        couleur="bleu marine",
+        etat="tres_bon_etat",
+        matiere=None,
+        defauts=None,
+        titre="Sweat demi-zip Ralph Lauren bleu marine taille M",
+        description="Sweat demi-zip Ralph Lauren bleu marine, taille M.\nPorté mais en très bon état.",
+        mots_cles=["ralph lauren", "sweat", "demi-zip"],
+        prix_estime=40,
+    )
 
 
 # --- Réponses aux messages et aux offres ------------------------------------------------------

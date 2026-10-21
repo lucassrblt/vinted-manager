@@ -152,7 +152,8 @@ def test_generation_annonce(monkeypatch: pytest.MonkeyPatch) -> None:
     appel = faux.appels[0]
     assert appel["model"] == get_settings().anthropic_model
     assert appel["output_config"]["format"]["type"] == "json_schema"
-    assert "N'affirme JAMAIS" in appel["system"]  # prompt chargé depuis app/prompts/
+    assert "N'affirme jamais" in appel["system"]  # prompt chargé depuis app/prompts/
+    assert "Porté mais en très bon état" in appel["system"]  # consignes de style incluses
     assert "Marque : Ralph Lauren" in appel["messages"][0]["content"]
 
 

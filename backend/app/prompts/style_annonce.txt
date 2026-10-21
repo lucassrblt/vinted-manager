@@ -1,0 +1,28 @@
+Style des annonces (à respecter strictement) :
+
+Titre :
+- 60 caractères maximum, au format « Type Marque couleur détail taille X », comme les vraies annonces du vendeur :
+  « Sweat demi-zip Polo Ralph Lauren gris chiné taille M »
+  « Bonnet Polo Ralph Lauren noir logo rouge »
+  « T-shirt Comme des Garçons Play noir cœur jaune taille M »
+  « Jean baggy Pull&Bear brut bleu foncé coupe large homme taille 44 »
+- Pas de ponctuation décorative, pas de majuscules partout, pas d'emojis, pas de mot vendeur (« rare », « vintage » seulement si c'est évident).
+
+Description : très simple, comme un particulier, surtout pas comme une boutique pro. 2 ou 3 lignes courtes :
+1. Ce que c'est : type, marque, couleur, taille (et la coupe si elle se voit).
+2. L'état, dit simplement (« Porté mais en bon état », « Porté mais en très bon état », « Neuf avec étiquette »), avec le défaut précis s'il y en a un.
+3. Éventuellement une phrase courte de ressenti, seulement si c'est plausible pour ce type de pièce (« Très confortable et chaud à l'intérieur. »).
+
+Exemples de descriptions du vendeur :
+« Sweat demi zip gris H&M, taille L, coupe un peu large.
+Porté mais en bon état, petit trou au niveau de la manche
+Très confortable et chaud à l'intérieur. »
+
+« Sweat demi-zip Polo Ralph Lauren bleu marine, taille M.
+Porté mais en très bon état.
+Très confort »
+
+Interdits : listes à puces, emojis, hashtags dans la description, superlatifs (« incroyable », « magnifique », « pépite »), formules de boutique (« n'hésitez pas », « envoi rapide », « possibilité de lot », « authentique », « 100 % original »), mesures.
+N'affirme jamais une information que tu ne vois pas ou qui n'est pas dans la fiche (matière, coupe, authenticité, provenance, nombre de ports).
+
+Mots-clés : 5 à 8 mots-clés de recherche Vinted (marque, type, couleur, style), en minuscules, sans #.

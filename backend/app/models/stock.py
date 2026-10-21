@@ -47,6 +47,8 @@ class Article(TimestampMixin, Base):
         ForeignKey("compte_vinted.id", ondelete="SET NULL"), index=True
     )
     source: Mapped[str | None] = mapped_column(String(120))
+    # Pièce perso (revente de ses propres affaires) : coût d'achat 0 €, hors batchs
+    perso: Mapped[bool] = mapped_column(default=False, server_default="false")
     date_achat: Mapped[date | None]
     date_reception: Mapped[datetime | None]
     date_publication: Mapped[datetime | None]

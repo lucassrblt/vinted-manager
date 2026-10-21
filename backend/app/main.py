@@ -13,6 +13,7 @@ from app.api import (
     auth,
     batches,
     compta,
+    creation,
     import_export,
     mails,
     photos,
@@ -81,6 +82,7 @@ publique.include_router(auth.router)
 protegee = APIRouter(prefix="/api", dependencies=[Depends(session_requise)])
 for module in (
     photos,
+    creation,
     annonces,
     articles,
     push,

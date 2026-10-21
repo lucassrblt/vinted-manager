@@ -2,12 +2,13 @@
 
 from dataclasses import asdict
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 
+from app.api import creation
 from app.api.deps import Db, get_parametres
 from app.config import get_settings
 from app.db import utcnow
@@ -74,6 +75,7 @@ def fiche_annonce(article_id: int, db: Db) -> dict[str, Any]:
     return {
         "article": vers_out(a, get_parametres(db)),
         "prix_conseille": asdict(calculer_prix(db, a)),
+        "retouche_possible": creation.retouche_possible(db),
         "modele_id": modele.id if modele else None,
         "ia_disponible": bool(get_settings().anthropic_api_key) or get_settings().ia_factice,
     }
@@ -91,6 +93,9 @@ class FicheIn(BaseModel):
     mesures: dict[str, str] | None = None
     modele_annonce_id: int | None = None
     essai: int = Field(default=0, ge=0, le=20)
+    # Régénérer seulement une partie, avec une consigne libre (« plus court », « plus vendeur »…)
+    cible: Literal["tout", "titre", "description"] = "tout"
+    consigne: str | None = Field(default=None, max_length=1500)
 
 
 ETATS_LIBELLES = {
@@ -106,7 +111,7 @@ ETATS_LIBELLES = {
 def generer(article_id: int, data: FicheIn, db: Db) -> dict[str, Any]:
     a = _article(db, article_id)
     # La fiche complétée est enregistrée sur l'article (elle sert aussi aux réponses aux acheteurs).
-    for cle, valeur in data.model_dump(exclude={"modele_annonce_id", "essai"}).items():
+    for cle, valeur in data.model_dump(exclude={"modele_annonce_id", "essai", "cible", "consigne"}).items():
         if cle == "mesures":
             valeur = {k: v for k, v in (valeur or {}).items() if v} or None
         setattr(a, cle, valeur or None)
@@ -127,15 +132,22 @@ def generer(article_id: int, data: FicheIn, db: Db) -> dict[str, Any]:
             if modele
             else None,  # fmt: skip
             data.essai,
+            data.consigne,
         )
     except ia.ErreurIA as exc:
         db.commit()  # la fiche saisie est conservée même si l'IA échoue
         raise HTTPException(502, str(exc)) from exc
-    a.titre_annonce = annonce.titre
-    a.description_annonce = annonce.description
-    a.mots_cles_annonce = ", ".join(annonce.mots_cles)
+    if data.cible in ("tout", "titre"):
+        a.titre_annonce = annonce.titre
+    if data.cible in ("tout", "description"):
+        a.description_annonce = annonce.description
+        a.mots_cles_annonce = ", ".join(annonce.mots_cles)
     db.commit()
-    return {"titre": annonce.titre, "description": annonce.description, "mots_cles": annonce.mots_cles}
+    return {
+        "titre": a.titre_annonce or annonce.titre,
+        "description": a.description_annonce or annonce.description,
+        "mots_cles": [m.strip() for m in (a.mots_cles_annonce or "").split(",") if m.strip()],
+    }
 
 
 def _fiche(a: Article) -> dict[str, Any]:

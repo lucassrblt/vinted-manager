@@ -1,9 +1,10 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { ChevronRight, Megaphone } from "lucide-react";
+import { ChevronRight, ImagePlus, Megaphone } from "lucide-react";
 import Link from "next/link";
 
+import { Button } from "@/components/ui/button";
 import { EnTetePage, EtatVide, LignesSquelette, MessageErreur } from "@/components/commun";
 import { api } from "@/lib/api";
 import { formatEuros } from "@/lib/format";
@@ -19,6 +20,13 @@ export default function PageAnnonces() {
       <EnTetePage
         titre="Annonces"
         description={data ? `${data.length} article(s) reçu(s) à mettre en ligne` : "Articles reçus à mettre en ligne"}
+        actions={
+          <Button asChild>
+            <Link href="/annonces/nouvelle">
+              <ImagePlus /> Nouvelle annonce
+            </Link>
+          </Button>
+        }
       />
       {error ? (
         <MessageErreur erreur={error} reessayer={() => refetch()} />
@@ -39,7 +47,9 @@ export default function PageAnnonces() {
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium">{a.nom}</span>
                   <span className="text-xs text-muted-foreground">
-                    {[a.marque, a.taille, `achat ${formatEuros(a.prix_achat_net)}`].filter(Boolean).join(" · ")}
+                    {[a.marque, a.taille, a.perso ? "pièce perso" : `achat ${formatEuros(a.prix_achat_net)}`]
+                      .filter(Boolean)
+                      .join(" · ")}
                   </span>
                 </span>
                 {a.titre_annonce && (

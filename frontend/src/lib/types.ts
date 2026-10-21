@@ -22,6 +22,7 @@ export interface Article {
   batch_id: number | null;
   batch_nom: string | null;
   compte_id: number | null;
+  perso: boolean;
   source: string | null;
   date_achat: string | null;
   date_reception: string | null;
@@ -416,6 +417,17 @@ export interface FicheAnnonce {
   prix_conseille: PrixConseille;
   modele_id: number | null;
   ia_disponible: boolean;
+  retouche_possible: boolean;
+}
+
+export interface Correspondance {
+  id: number;
+  nom: string;
+  taille: string | null;
+  statut: Statut;
+  batch_nom: string | null;
+  prix_achat_net: Decimal | null;
+  score: number;
 }
 
 export interface AnnonceGeneree {
