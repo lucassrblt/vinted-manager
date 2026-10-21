@@ -12,8 +12,23 @@ import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
 import { formatDateHeure, formatEuros } from "@/lib/format";
 import { useInvaliderStock } from "@/lib/queries";
-import type { VenteAConfirmer, VenteListe } from "@/lib/types";
+import type { TypeEmail, VenteAConfirmer, VenteListe } from "@/lib/types";
 import { cn } from "@/lib/utils";
+
+/** Dernière étape connue de la commande, d'après les mails reçus depuis la vente. */
+const ETAPES: Partial<Record<TypeEmail, { libelle: string; classe: string }>> = {
+  bordereau: { libelle: "Bordereau reçu", classe: "bg-muted text-muted-foreground" },
+  expedie: { libelle: "Colis en route", classe: "bg-sky-50 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300" },
+  livre: { libelle: "Déjà livrée", classe: "bg-brand-soft text-brand" },
+  annulation: { libelle: "Annulée", classe: "bg-muted text-muted-foreground" },
+  litige: { libelle: "Litige", classe: "bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300" },
+};
+
+function BadgeEtape({ etape }: { etape: TypeEmail | null }) {
+  const e = etape ? ETAPES[etape] : undefined;
+  if (!e) return null;
+  return <span className={cn("rounded-md px-1.5 py-0.5 text-[11px] font-medium", e.classe)}>{e.libelle}</span>;
+}
 
 export default function PageVentes() {
   const qc = useQueryClient();
@@ -88,6 +103,7 @@ export default function PageVentes() {
                     <p className="flex flex-wrap items-center gap-2 font-medium">
                       {v.donnees.titre_article ? `« ${v.donnees.titre_article} »` : v.sujet}
                       <BadgeCompte nom={v.compte} />
+                      <BadgeEtape etape={v.etape} />
                     </p>
                     <p className="text-sm text-muted-foreground tabular-nums">
                       {[

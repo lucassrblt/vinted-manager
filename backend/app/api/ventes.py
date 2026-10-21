@@ -34,6 +34,7 @@ def ventes_a_confirmer(db: Db) -> list[dict[str, Any]]:
     ).all()
     resultat = []
     comptes = noms_comptes(db)
+    etapes = traitement.etapes_par_titre(db)
     for e in emails:
         d = e.donnees_extraites or {}
         prix = Decimal(d["prix"]) if d.get("prix") else None
@@ -46,6 +47,7 @@ def ventes_a_confirmer(db: Db) -> list[dict[str, Any]]:
                 "date": e.date,
                 "sujet": e.sujet,
                 "compte": comptes.get(e.compte_id) if e.compte_id else None,
+                "etape": traitement.etape_commande(etapes, d.get("titre_article"), e.date),
                 "donnees": d,
                 "candidats": [c.__dict__ for c in candidats],
             }
@@ -154,6 +156,8 @@ def lister_envois(db: Db, termines: bool = False) -> dict[str, Any]:
         )
         .order_by(EmailVinted.date.desc())
     ).all()
+    termines_sans_vente = traitement.mails_termines(db)  # déjà envoyés et reçus : plus rien à faire
+    a_rattacher = [m for m in a_rattacher if m.id not in termines_sans_vente]
     return {
         "envois": [_envoi_out(e, v, a) for e, v, a in lignes],
         "bordereaux_a_rattacher": [

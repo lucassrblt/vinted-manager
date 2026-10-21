@@ -24,10 +24,14 @@ import { cn } from "@/lib/utils";
 
 type Onglet = "a_classer" | "a_rattacher" | "tous";
 
-const FILTRES: Record<Onglet, { statut?: StatutTraitement[]; type?: TypeEmail[] }> = {
+const FILTRES: Record<Onglet, { statut?: StatutTraitement[]; type?: TypeEmail[]; ouverts?: boolean }> = {
   a_classer: { statut: ["a_classer"] },
   // Type reconnu mais action en attente ; les ventes ont leur propre page.
-  a_rattacher: { statut: ["nouveau"], type: ["bordereau", "expedie", "livre", "litige", "message", "offre"] },
+  a_rattacher: {
+    statut: ["nouveau"],
+    type: ["bordereau", "expedie", "livre", "litige", "message", "offre", "annulation"],
+    ouverts: true,
+  },
   tous: {},
 };
 

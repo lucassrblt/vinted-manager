@@ -7,12 +7,12 @@ Statut de traitement d'un mail :
 - `ignore` : écarté à la main
 """
 
+import re
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
-from rapidfuzz import fuzz
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.db import utcnow
@@ -104,6 +104,7 @@ def appliquer(db: Session, email: EmailVinted, article: Article | None = None) -
         TypeEmail.EXPEDIE: _suivi_colis,
         TypeEmail.LIVRE: _suivi_colis,
         TypeEmail.LITIGE: _litige,
+        TypeEmail.ANNULATION: _annulation,
         TypeEmail.MESSAGE: _message,
         TypeEmail.OFFRE: _message,
     }
@@ -145,9 +146,19 @@ def _decimal(v: Any) -> Decimal | None:
 
 def confirmer_vente(db: Session, email: EmailVinted, article: Article, auto: bool) -> Vente:
     d = email.donnees_extraites or {}
-    quand = email.date or utcnow()
     if article.statut in rapprochement.STATUTS_A_COMPLETER:
-        return _completer_vente_importee(db, email, article, auto)
+        vente = _completer_vente_importee(db, email, article, auto)
+    else:
+        vente = _nouvelle_vente(db, email, article, auto)
+    if not article.titre_annonce and d.get("titre_article"):
+        article.titre_annonce = str(d["titre_article"])[:120]  # titre Vinted : sert aux mails suivants
+    rejouer_mails_de_la_vente(db, vente)
+    return vente
+
+
+def _nouvelle_vente(db: Session, email: EmailVinted, article: Article, auto: bool) -> Vente:
+    d = email.donnees_extraites or {}
+    quand = email.date or utcnow()
     prix = _decimal(d.get("prix")) or article.prix_vente_cible or Decimal("0")
     vente = Vente(
         article_id=article.id,
@@ -239,7 +250,7 @@ def _completer_vente_importee(db: Session, email: EmailVinted, article: Article,
     return vente
 
 
-def annuler_vente(db: Session, vente: Vente) -> None:
+def annuler_vente(db: Session, vente: Vente, commentaire: str = "Rapprochement annulé") -> None:
     """Annule un rapprochement : l'article repasse en ligne et le mail revient « à confirmer »."""
     article = db.get(Article, vente.article_id)
     if article is not None and vente.date_estimee_import is not None:
@@ -247,7 +258,7 @@ def annuler_vente(db: Session, vente: Vente) -> None:
         article.date_vente = vente.date_estimee_import
         _dater_passage_vendu(db, article, vente.date_estimee_import, "Import Excel (date estimée)")
     elif article is not None:
-        changer_statut(db, article, StatutArticle.EN_LIGNE, commentaire="Rapprochement annulé")
+        changer_statut(db, article, StatutArticle.EN_LIGNE, commentaire=commentaire)
         article.date_vente = None
         article.prix_vente_reel = None
         article.date_envoi = None
@@ -279,25 +290,78 @@ def _rattacher_bordereau(db: Session, envoi: Envoi, email: EmailVinted) -> bool:
     return True
 
 
-def trouver_envoi(db: Session, donnees: dict[str, Any], statuts_ouverts: bool = True) -> Envoi | None:
-    """Envoi concerné par un mail : par numéro de commande, sinon par titre d'article."""
+def titre_cle(titre: str | None) -> str:
+    """Titre comparable : sans accents, ponctuation ni espaces multiples."""
+    return " ".join(re.sub(r"[^\w\s]", " ", normaliser(titre or "")).split())
+
+
+def titres_du_mail(titre: str | None) -> list[str]:
+    """Le titre entier, puis chaque article d'un lot (« A, B » dans un bordereau groupé)."""
+    if not titre:
+        return []
+    morceaux = [titre_cle(t) for t in re.split(r",\s+", titre)] if "," in titre else []
+    return [titre_cle(titre)] + [m for m in morceaux if m]
+
+
+def titre_vente(db: Session, vente: Vente) -> str:
+    """Titre de l'annonce Vinted vendue : celui du mail de vente, sinon le titre d'annonce de l'article."""
+    if titre := _titre_mail_vente(db, vente):
+        return titre_cle(titre)
+    article = db.get(Article, vente.article_id)
+    return titre_cle(article.titre_annonce or article.nom) if article else ""
+
+
+def trouver_envoi(
+    db: Session,
+    donnees: dict[str, Any],
+    statuts_ouverts: bool = True,
+    date_mail: datetime | None = None,
+    sans_bordereau: bool = False,
+) -> Envoi | None:
+    """Envoi concerné par un mail : par numéro de commande, puis par titre exact de l'annonce vendue
+    (la plus ancienne vente encore ouverte si le même titre a été vendu plusieurs fois), puis par
+    ressemblance avec le nom de l'article."""
     requete = select(Envoi, Vente, Article).join(Vente, Envoi.vente_id == Vente.id).join(Article)
     if statuts_ouverts:
         requete = requete.where(Envoi.statut != StatutEnvoi.LIVRE)
-    lignes = db.execute(requete).all()
+    if date_mail is not None:
+        requete = requete.where(Vente.date_heure <= date_mail)
+    lignes = db.execute(requete.order_by(Vente.date_heure)).all()
     if numero := donnees.get("numero_commande"):
         for envoi, vente, _ in lignes:
             if vente.numero_commande and vente.numero_commande == numero:
                 return envoi
-    if titre := donnees.get("titre_article"):
+    titres = titres_du_mail(donnees.get("titre_article"))
+    if titres:
+        exacts = [(e, v) for e, v, _ in lignes if titre_vente(db, v) in titres]
+        if sans_bordereau:
+            exacts = [x for x in exacts if not x[0].fichier_bordereau and not x[0].lien_bordereau] or exacts
+        if (acheteur := donnees.get("acheteur")) and len(exacts) > 1:
+            # Même titre vendu plusieurs fois : le pseudo de l'acheteur départage.
+            exacts = [x for x in exacts if (x[1].acheteur or "").lower() == str(acheteur).lower()] or exacts
+        if exacts:
+            return exacts[0][0]
+        # Repli prudent sur le nom de l'article : seulement les ventes dont on ne connaît pas le titre
+        # Vinted, et une correspondance nette (sinon « Ralph Lauren » relierait n'importe quel article).
+        sans_titre = [(e, a) for e, v, a in lignes if not _titre_mail_vente(db, v)]
         scores = sorted(
-            ((fuzz.token_set_ratio(normaliser(titre), normaliser(a.nom)), e) for e, _, a in lignes),
+            ((rapprochement.score_titre(donnees["titre_article"], a), e) for e, a in sans_titre),
             key=lambda x: x[0],
             reverse=True,
         )
-        if scores and scores[0][0] >= SEUIL_TITRE and (len(scores) == 1 or scores[0][0] - scores[1][0] >= 10):
+        if (
+            scores
+            and scores[0][0] >= rapprochement.SEUIL_AUTO
+            and (len(scores) == 1 or scores[0][0] - scores[1][0] >= rapprochement.ECART_AUTO)
+        ):
             return scores[0][1]
     return None
+
+
+def _titre_mail_vente(db: Session, vente: Vente) -> str | None:
+    mail = db.get(EmailVinted, vente.email_id) if vente.email_id else None
+    titre = (mail.donnees_extraites or {}).get("titre_article") if mail else None
+    return str(titre) if titre else None
 
 
 def _envoi_de_article(db: Session, article: Article) -> Envoi | None:
@@ -308,7 +372,11 @@ def _envoi_de_article(db: Session, article: Article) -> Envoi | None:
 
 def _bordereau(db: Session, email: EmailVinted, article: Article | None) -> None:
     d = email.donnees_extraites or {}
-    envoi = _envoi_de_article(db, article) if article else trouver_envoi(db, d)
+    envoi = (
+        _envoi_de_article(db, article)
+        if article
+        else trouver_envoi(db, d, date_mail=email.date, sans_bordereau=True)
+    )
     if envoi is None:
         # Un seul colis sans bordereau en attente : c'est forcément lui.
         sans = db.scalars(
@@ -349,16 +417,193 @@ def changer_statut_envoi(
 
 def _suivi_colis(db: Session, email: EmailVinted, article: Article | None) -> None:
     d = email.donnees_extraites or {}
-    envoi = _envoi_de_article(db, article) if article else trouver_envoi(db, d)
+    envoi = _envoi_de_article(db, article) if article else trouver_envoi(db, d, date_mail=email.date)
     if envoi is None:
         email.statut_traitement = StatutTraitementEmail.NOUVEAU
         return
     statut = StatutEnvoi.LIVRE if email.type_detecte == TypeEmail.LIVRE else StatutEnvoi.DEPOSE
-    changer_statut_envoi(db, envoi, statut, quand=email.date)
+    if not (statut == StatutEnvoi.DEPOSE and envoi.statut == StatutEnvoi.LIVRE):  # jamais en arrière
+        changer_statut_envoi(db, envoi, statut, quand=email.date)
     vente = db.get(Vente, envoi.vente_id)
     email.vente_id = envoi.vente_id
     email.article_id = vente.article_id if vente else None
     email.statut_traitement = StatutTraitementEmail.TRAITE
+
+
+def _annulation(db: Session, email: EmailVinted, article: Article | None) -> None:
+    """Commande annulée sur Vinted : la vente est retirée, l'article redevient en ligne."""
+    d = email.donnees_extraites or {}
+    envoi = _envoi_de_article(db, article) if article else trouver_envoi(db, d, date_mail=email.date)
+    vente = db.get(Vente, envoi.vente_id) if envoi else None
+    if vente is not None:
+        email.article_id = vente.article_id
+        annuler_vente(db, vente, commentaire="Commande annulée sur Vinted")
+    # La vente annulée n'est plus à confirmer.
+    titres = titres_du_mail(d.get("titre_article"))
+    ventes_en_attente = db.scalars(
+        select(EmailVinted)
+        .where(
+            EmailVinted.type_detecte == TypeEmail.VENTE,
+            EmailVinted.statut_traitement == StatutTraitementEmail.NOUVEAU,
+            EmailVinted.date <= (email.date or utcnow()),
+        )
+        .order_by(EmailVinted.date.desc())
+    ).all()
+    for mail in ventes_en_attente:
+        if titre_cle((mail.donnees_extraites or {}).get("titre_article")) in titres:
+            mail.statut_traitement = StatutTraitementEmail.TRAITE
+            break
+    email.statut_traitement = StatutTraitementEmail.TRAITE
+
+
+TYPES_SUIVI = [
+    TypeEmail.BORDEREAU,
+    TypeEmail.EXPEDIE,
+    TypeEmail.LIVRE,
+    TypeEmail.LITIGE,
+    TypeEmail.ANNULATION,
+]
+
+
+def rejouer_mails_de_la_vente(db: Session, vente: Vente) -> int:
+    """Après une vente confirmée : traite, dans l'ordre, les mails déjà reçus pour ce titre
+    (bordereau, expédition, livraison, annulation…) restés sans vente."""
+    titre = titre_vente(db, vente)
+    if not titre:
+        return 0
+    en_attente = db.scalars(
+        select(EmailVinted)
+        .where(
+            EmailVinted.statut_traitement == StatutTraitementEmail.NOUVEAU,
+            EmailVinted.type_detecte.in_([t.value for t in TYPES_SUIVI]),
+            EmailVinted.vente_id.is_(None),
+            EmailVinted.date >= vente.date_heure,
+        )
+        .order_by(EmailVinted.date)
+    ).all()
+    rejoues = 0
+    for mail in en_attente:
+        if titre in titres_du_mail((mail.donnees_extraites or {}).get("titre_article")):
+            appliquer(db, mail)
+            rejoues += 1
+    return rejoues
+
+
+def retraiter_mails(db: Session) -> int:
+    """Reclasse et retraite, dans l'ordre chronologique, tous les mails sans vente ni rattachement
+    manuel (après une mise à jour des règles). Renvoie le nombre de mails dont le type a changé."""
+    regles = regles_actives(db)
+    changes = 0
+    # Mails déjà rattachés à une vente : on garde leur traitement, on complète seulement les données
+    # extraites (le titre Vinted sert à relier les mails suivants).
+    for lie in db.scalars(select(EmailVinted).where(EmailVinted.vente_id.is_not(None))):
+        relu = classifieur.classer(regles, mail_depuis_email(db, lie))
+        if relu.type == lie.type_detecte:
+            lie.donnees_extraites = (lie.donnees_extraites or {}) | relu.donnees
+    db.flush()
+    ids = db.scalars(
+        select(EmailVinted.id)
+        .where(
+            EmailVinted.vente_id.is_(None),
+            EmailVinted.statut_traitement != StatutTraitementEmail.IGNORE,
+            or_(
+                EmailVinted.statut_traitement != StatutTraitementEmail.TRAITE,
+                EmailVinted.article_id.is_(None),
+                EmailVinted.type_detecte.in_([TypeEmail.MESSAGE.value, TypeEmail.OFFRE.value]),
+            ),
+        )
+        .order_by(EmailVinted.date, EmailVinted.id)
+    ).all()
+    for email_id in ids:
+        email = db.get(EmailVinted, email_id)
+        if email is None or email.vente_id is not None:
+            continue  # déjà traité en cascade par une vente rapprochée plus tôt dans la boucle
+        resultat = classifieur.classer(regles, mail_depuis_email(db, email))
+        changes += resultat.type != email.type_detecte
+        email.type_detecte = resultat.type
+        email.regle_id = resultat.regle_id
+        email.donnees_extraites = resultat.donnees
+        if resultat.type is None:
+            email.statut_traitement = StatutTraitementEmail.A_CLASSER
+        else:
+            email.statut_traitement = StatutTraitementEmail.NOUVEAU
+            appliquer(db, email)
+        db.flush()
+    annuler_en_attente(db)  # relecture : aucune notification
+    db.commit()
+    return changes
+
+
+def etapes_par_titre(db: Session) -> dict[str, list[tuple[datetime, str]]]:
+    """Étapes de commande connues par titre (bordereau, en route, reçue, annulée, litige), datées."""
+    etapes: dict[str, list[tuple[datetime, str]]] = {}
+    for mail in db.scalars(
+        select(EmailVinted).where(EmailVinted.type_detecte.in_([t.value for t in TYPES_SUIVI]))
+    ):
+        for t in titres_du_mail((mail.donnees_extraites or {}).get("titre_article")):
+            etapes.setdefault(t, []).append((mail.date or utcnow(), str(mail.type_detecte)))
+    return etapes
+
+
+def etape_commande(
+    etapes: dict[str, list[tuple[datetime, str]]], titre: str | None, depuis: datetime | None
+) -> str | None:
+    """Dernière étape connue d'une commande depuis la vente (aide à confirmer une vente ancienne)."""
+    suivantes = [
+        (quand, type_)
+        for t in titres_du_mail(titre)
+        for quand, type_ in etapes.get(t, [])
+        if depuis is None or quand >= depuis
+    ]
+    return max(suivantes)[1] if suivantes else None
+
+
+# Mails qui rendent caduc un mail de suivi antérieur au même titre (le colis est parti, arrivé, annulé…)
+CLOTURE = {
+    TypeEmail.BORDEREAU: {TypeEmail.EXPEDIE, TypeEmail.LIVRE, TypeEmail.ANNULATION, TypeEmail.LITIGE},
+    TypeEmail.EXPEDIE: {TypeEmail.LIVRE, TypeEmail.ANNULATION},
+}
+
+
+def mails_termines(db: Session) -> set[int]:
+    """Mails de suivi restés sans vente mais dont il n'y a plus rien à faire : un mail ultérieur au
+    même titre montre que l'étape est passée (bordereau puis colis en route, colis en route puis reçu…),
+    la vente a été ignorée, ou c'est un mail de réception (la commande est terminée)."""
+    suites: list[tuple[str, set[str], datetime]] = []
+    for mail in db.scalars(
+        select(EmailVinted).where(
+            EmailVinted.type_detecte.in_(
+                [
+                    t.value
+                    for t in (TypeEmail.EXPEDIE, TypeEmail.LIVRE, TypeEmail.ANNULATION, TypeEmail.LITIGE)
+                ]
+            )
+            | (
+                (EmailVinted.type_detecte == TypeEmail.VENTE)
+                & (EmailVinted.statut_traitement == StatutTraitementEmail.IGNORE)
+            )
+        )
+    ):
+        titres = set(titres_du_mail((mail.donnees_extraites or {}).get("titre_article")))
+        suites.append((str(mail.type_detecte), titres, mail.date or utcnow()))
+    termines = set()
+    for mail in db.scalars(
+        select(EmailVinted).where(
+            EmailVinted.statut_traitement == StatutTraitementEmail.NOUVEAU,
+            EmailVinted.type_detecte.in_(
+                [TypeEmail.BORDEREAU.value, TypeEmail.EXPEDIE.value, TypeEmail.LIVRE.value]
+            ),
+        )
+    ):
+        if mail.type_detecte == TypeEmail.LIVRE:
+            termines.add(mail.id)
+            continue
+        fermants = {t.value for t in CLOTURE[TypeEmail(str(mail.type_detecte))]} | {TypeEmail.VENTE.value}
+        titres = set(titres_du_mail((mail.donnees_extraites or {}).get("titre_article")))
+        quand = mail.date or utcnow()
+        if any(type_ in fermants and t & titres and date > quand for type_, t, date in suites):
+            termines.add(mail.id)
+    return termines
 
 
 # --- Litiges et messages ----------------------------------------------------------------------
@@ -402,7 +647,7 @@ def _article_par_titre(
 def _litige(db: Session, email: EmailVinted, article: Article | None) -> None:
     d = email.donnees_extraites or {}
     if article is None:
-        envoi = trouver_envoi(db, d, statuts_ouverts=False)
+        envoi = trouver_envoi(db, d, statuts_ouverts=False, date_mail=email.date)
         vente = db.get(Vente, envoi.vente_id) if envoi else None
         article = db.get(Article, vente.article_id) if vente else None
     if article is None:

@@ -252,6 +252,8 @@ def lister_emails(
     statut: list[StatutTraitementEmail] | None = Query(None),
     type: list[TypeEmail] | None = Query(None),
     compte: int | None = None,
+    # Masque les mails de suivi d'une commande déjà terminée (rien à rattacher)
+    ouverts: bool = False,
     page: int = Query(1, ge=1),
     taille_page: int = Query(50, ge=1, le=200),
 ) -> dict[str, Any]:
@@ -262,6 +264,8 @@ def lister_emails(
         q = q.where(EmailVinted.type_detecte.in_([t.value for t in type]))
     if compte is not None:
         q = q.where(EmailVinted.compte_id == compte)
+    if ouverts and (termines := traitement.mails_termines(db)):
+        q = q.where(EmailVinted.id.not_in(termines))
     total = db.scalar(select(func.count()).select_from(q.subquery())) or 0
     emails = db.scalars(
         q.order_by(EmailVinted.date.desc()).offset((page - 1) * taille_page).limit(taille_page)
@@ -562,19 +566,5 @@ def tester_regle(data: TestRegleIn, db: Db) -> dict[str, Any]:
 
 @router.post("/regles/reappliquer")
 def reappliquer(db: Db) -> dict[str, int]:
-    """Reclasse les mails non classés avec les règles actuelles."""
-    regles = traitement.regles_actives(db)
-    reclasses = 0
-    for email in db.scalars(
-        select(EmailVinted).where(EmailVinted.statut_traitement == StatutTraitementEmail.A_CLASSER)
-    ).all():
-        resultat = classifieur.classer(regles, traitement.mail_depuis_email(db, email))
-        if resultat.type:
-            email.type_detecte = resultat.type
-            email.regle_id = resultat.regle_id
-            email.donnees_extraites = resultat.donnees
-            email.statut_traitement = StatutTraitementEmail.NOUVEAU
-            traitement.appliquer(db, email)
-            reclasses += 1
-    db.commit()
-    return {"reclasses": reclasses}
+    """Relit tous les mails pas encore rattachés avec les règles actuelles (ordre chronologique)."""
+    return {"reclasses": traitement.retraiter_mails(db)}

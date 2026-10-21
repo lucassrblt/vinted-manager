@@ -87,6 +87,7 @@ export const TYPES_EMAIL: Record<TypeEmail, string> = {
   argent_disponible: "Argent disponible",
   evaluation: "Évaluation reçue",
   litige: "Litige",
+  annulation: "Commande annulée",
   autre: "Autre",
 };
 

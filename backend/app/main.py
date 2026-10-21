@@ -28,6 +28,7 @@ from app.db import SessionLocal
 from app.logging import configurer_logs, log
 from app.seed.modeles import installer_modeles
 from app.seed.regles import installer_regles
+from app.services import traitement
 
 configurer_logs(get_settings().log_level)
 
@@ -35,7 +36,8 @@ configurer_logs(get_settings().log_level)
 @asynccontextmanager
 async def cycle_de_vie(_: FastAPI) -> AsyncIterator[None]:
     with SessionLocal() as db:
-        installer_regles(db)
+        if installer_regles(db):
+            traitement.retraiter_mails(db)  # règles par défaut mises à jour : on relit les mails
         installer_modeles(db)
     scheduler.demarrer()
     yield

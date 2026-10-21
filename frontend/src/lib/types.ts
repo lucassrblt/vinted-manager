@@ -269,6 +269,7 @@ export type TypeEmail =
   | "argent_disponible"
   | "evaluation"
   | "litige"
+  | "annulation"
   | "autre";
 
 export type StatutTraitement = "nouveau" | "traite" | "ignore" | "a_classer";
@@ -321,6 +322,7 @@ export interface VenteAConfirmer {
   date: string | null;
   sujet: string | null;
   compte: string | null;
+  etape: TypeEmail | null;
   donnees: DonneesExtraites;
   candidats: Candidat[];
 }

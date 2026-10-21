@@ -80,6 +80,7 @@ class Parametres(Base):
     objectif_ventes_jour: Mapped[int] = mapped_column(default=3)
     arrondi_seuil: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("30"))
     arrondi_pas: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("5"))
+    version_regles: Mapped[int] = mapped_column(default=0, server_default="0")
     expediteurs_vinted: Mapped[list[str]] = mapped_column(JSON, default=lambda: ["vinted.fr", "vinted.com"])
     # Photos IA : modèle par type de photo (None = choix par défaut du code), modèle « haute qualité »
     # utilisé par le bouton de régénération premium, et photo du fond (tapis) servant de référence.

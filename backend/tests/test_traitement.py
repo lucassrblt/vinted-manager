@@ -41,7 +41,9 @@ def test_vente_rapprochee_automatiquement(db: Session, regles: None) -> None:
 
 def test_vente_ambigue_a_confirmer(client: TestClient, db: Session, regles: None) -> None:
     a = _article(db, "Pull demi-zip polaire Ralph Lauren - Noir")
-    _article(db, "Pull demi-zip polaire Ralph Lauren - Noir")  # doublon : impossible de choisir seul
+    _article(
+        db, "Pull demi-zip polaire Ralph Lauren - Noir", "40"
+    )  # quasi-doublon : impossible de choisir seul
     email = _recevoir(db, ms.VENTE)
     assert email.statut_traitement == "nouveau" and db.scalar(select(Vente)) is None
 
@@ -146,6 +148,28 @@ def test_bordereau_rattache_a_la_main(client: TestClient, db: Session, regles: N
     assert r.status_code == 200, r.text
     envoi = next(e for e in client.get("/api/envois").json()["envois"] if e["article"]["id"] == a2.id)
     assert envoi["a_bordereau_pdf"]
+
+
+def test_exemplaires_identiques_choisis_automatiquement(db: Session, regles: None) -> None:
+    a = _article(db, "Pull demi-zip polaire Ralph Lauren - Noir")
+    _article(db, "Pull demi-zip polaire Ralph Lauren - Noir")
+    email = _recevoir(db, ms.VENTE)
+    db.refresh(a)
+    assert email.statut_traitement == "traite" and a.statut == "vendu"  # le plus ancien des deux
+
+
+def test_rapprochement_ecarte_marque_et_taille_differentes(db: Session) -> None:
+    from app.services import rapprochement
+
+    _article(db, "Pull Ralph Lauren - bleu", "58")
+    m = _article(db, "Polaire Patagonia - bleu", "58")
+    m.taille = "L"
+    db.commit()
+    assert rapprochement.candidats(db, "Polaire Patagonia Microdini bleu taille M", None) == []
+    m.taille = "M"
+    db.commit()
+    [c] = rapprochement.candidats(db, "Polaire Patagonia Microdini bleu taille M", None)
+    assert c.article_id == m.id
 
 
 def test_rapprochement_distingue_les_couleurs(db: Session, regles: None) -> None:

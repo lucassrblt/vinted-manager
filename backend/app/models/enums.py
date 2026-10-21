@@ -51,6 +51,7 @@ class TypeEmail(StrEnum):
     ARGENT_DISPONIBLE = "argent_disponible"
     EVALUATION = "evaluation"
     LITIGE = "litige"
+    ANNULATION = "annulation"
     AUTRE = "autre"
 
 
