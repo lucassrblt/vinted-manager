@@ -1,6 +1,6 @@
 # Revente : gestion de l'activité Vinted
 
-Application personnelle (un seul utilisateur) qui remplace l'Excel « Suivi revente » : stock, batches, compta, sourcing, puis (étapes suivantes) lecture des mails Vinted, envois, annonces avec l'IA et notifications push.
+Application personnelle (un seul utilisateur) qui remplace l'Excel « Suivi revente » : stock, batches, compta, sourcing, lecture des mails Vinted, envois et bordereaux, annonces et réponses aux acheteurs avec l'IA, écran du jour et notifications push (PWA installable).
 
 - `backend/` : FastAPI, SQLAlchemy 2, Alembic, PostgreSQL
 - `frontend/` : Next.js 15, Tailwind 4, shadcn/ui
@@ -22,6 +22,9 @@ docker compose exec backend python -m app.cli create-user
 Ouvre ensuite http://localhost:3000, connecte-toi, puis va dans **Import / export** pour importer ton Excel.
 
 Pour changer le mot de passe : `docker compose exec backend python -m app.cli reset-password`.
+
+Pour essayer l'interface sans tes données (base vide uniquement) :
+`docker compose exec backend python -m app.cli seed-demo`.
 
 ### Développement sans Docker
 
@@ -74,9 +77,9 @@ npm run e2e   # app lancée, base vide, utilisateur demo@example.com / demo-motd
    | `COOKIE_SECURE` | `true` |
    | `FERNET_KEY` | voir plus bas (obligatoire pour configurer la boîte mail) |
    | `LOG_LEVEL` | `INFO` |
-   | `ANTHROPIC_API_KEY` | étape 3 |
-   | `ANTHROPIC_MODEL` | `claude-haiku-5-5` (étape 3, optionnel) |
-   | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | étape 4 |
+   | `ANTHROPIC_API_KEY` | clé API Anthropic (console.anthropic.com), pour les annonces et réponses |
+   | `ANTHROPIC_MODEL` | `claude-haiku-5-5` (optionnel) |
+   | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | notifications push (voir plus bas) |
 
 6. **Settings → Networking → Generate Domain** pour obtenir l'URL publique, par exemple `https://revente-backend.up.railway.app`.
 7. Une seule instance (ne pas augmenter les réplicas) : le planificateur de tâches tourne dans le même process. Les migrations Alembic sont lancées automatiquement à chaque démarrage.
@@ -98,11 +101,24 @@ npm run e2e   # app lancée, base vide, utilisateur demo@example.com / demo-motd
 # Clé Fernet (chiffrement des identifiants IMAP)
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 
-# Clés VAPID (notifications push, étape 4)
-npx web-push generate-vapid-keys
+# Clés VAPID (notifications push)
+docker compose exec backend python -m app.cli vapid-keys   # ou : cd backend && uv run python -m app.cli vapid-keys
 ```
 
+Copie les 3 lignes affichées (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` avec ton adresse) dans les variables du backend (Railway, ou `.env` en local), puis redémarre.
+
 Garde ces clés en lieu sûr : sans la même `FERNET_KEY`, les identifiants IMAP enregistrés ne peuvent plus être déchiffrés.
+
+### Installer l'app sur le téléphone et activer les notifications
+
+1. Ouvre l'URL Vercel sur ton téléphone et connecte-toi.
+2. **iPhone** : dans Safari, bouton Partager → « Sur l'écran d'accueil », puis ouvre Revente **depuis l'icône** (sur iPhone, les notifications ne fonctionnent que dans l'app installée). **Android** : menu de Chrome → « Installer l'application ».
+3. Dans l'app : Paramètres → Notifications → « Activer les notifications sur cet appareil », puis « Envoyer une notification de test ».
+4. Choisis les notifications voulues : nouvelle vente, nouveau litige, nouvelle offre, rappel de 9 h des colis à envoyer.
+
+### Sauvegarde
+
+Paramètres → Sauvegarde → « Télécharger la sauvegarde complète » : un zip avec l'export Excel, toute la base en JSON (sans mots de passe) et tous les fichiers (preuves, bordereaux, pièces jointes).
 
 ### Mot de passe d'application Gmail
 

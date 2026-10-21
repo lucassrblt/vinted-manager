@@ -1,13 +1,16 @@
 """Tâches planifiées, dans le process de l'API (une seule instance en production)."""
 
 from apscheduler.schedulers.background import BackgroundScheduler
+from sqlalchemy import select
 
 from app.config import get_settings
-from app.db import SessionLocal
+from app.db import SessionLocal, utcnow
 from app.logging import log
-from app.models import Parametres
-from app.services import imap_sync
+from app.models import Envoi, Parametres
+from app.models.enums import StatutEnvoi
+from app.services import imap_sync, push
 from app.services.auth import nettoyer_sessions
+from app.services.stats import jour_local
 
 planificateur: BackgroundScheduler | None = None
 
@@ -23,6 +26,30 @@ def tache_synchro() -> None:
             log.info("sync_ignoree", raison=str(exc))
         except Exception:
             log.exception("sync_erreur")
+
+
+def tache_rappel_envois() -> None:
+    """9 h (heure de Paris) : rappel des colis à déposer aujourd'hui ou en retard."""
+    with SessionLocal() as db:
+        aujourdhui = jour_local(utcnow())
+        limites = db.scalars(
+            select(Envoi.date_limite_envoi).where(
+                Envoi.statut.in_([StatutEnvoi.A_IMPRIMER, StatutEnvoi.IMPRIME])
+            )
+        ).all()
+        jours = [jour_local(d) for d in limites if d is not None]
+        retard = sum(1 for j in jours if j < aujourdhui)
+        du_jour = sum(1 for j in jours if j == aujourdhui)
+        if retard + du_jour == 0:
+            return
+        morceaux = []
+        if du_jour:
+            morceaux.append(f"{du_jour} à déposer aujourd'hui")
+        if retard:
+            morceaux.append(f"{retard} en retard")
+        push.envoyer(
+            db, "rappel_envois", f"{retard + du_jour} colis à envoyer", " · ".join(morceaux), "/envois"
+        )
 
 
 def tache_nettoyage() -> None:
@@ -44,6 +71,7 @@ def demarrer() -> None:
         max_instances=1,
         coalesce=True,
     )
+    planificateur.add_job(tache_rappel_envois, "cron", hour=9, minute=0, id="rappel_envois")
     planificateur.add_job(tache_nettoyage, "cron", hour=4, id="nettoyage")
     planificateur.start()
     log.info("planificateur_demarre")

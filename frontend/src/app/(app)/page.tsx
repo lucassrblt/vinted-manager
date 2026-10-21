@@ -74,6 +74,21 @@ export default function EcranDuJourPage() {
         <GrilleSquelette n={8} />
       ) : (
         <>
+          {d.litiges > 0 && (
+            <Link
+              href="/stock?statut=litige"
+              className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 hover:bg-red-100 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300"
+            >
+              <AlertTriangle className="size-5 shrink-0" />
+              <span className="flex-1">
+                <strong>
+                  {d.litiges} litige{d.litiges > 1 ? "s" : ""} en cours
+                </strong>{" "}
+                · tes preuves d&apos;achat sont prêtes à télécharger depuis la fiche de l&apos;article.
+              </span>
+            </Link>
+          )}
+
           <div className="rounded-xl border bg-card p-4">
             <div className="flex items-center justify-between gap-2">
               <span className="flex items-center gap-2 text-sm font-medium">

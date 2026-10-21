@@ -16,6 +16,7 @@ from app.api import (
     import_export,
     mails,
     preuves,
+    push,
     sourcing,
     systeme,
     ventes,
@@ -75,7 +76,19 @@ publique = APIRouter(prefix="/api")
 publique.include_router(auth.router)
 
 protegee = APIRouter(prefix="/api", dependencies=[Depends(session_requise)])
-for module in (annonces, articles, batches, preuves, import_export, compta, sourcing, systeme, mails, ventes):
+for module in (
+    annonces,
+    articles,
+    push,
+    batches,
+    preuves,
+    import_export,
+    compta,
+    sourcing,
+    systeme,
+    mails,
+    ventes,
+):
     protegee.include_router(module.router)
 
 app.include_router(publique)

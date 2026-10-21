@@ -107,4 +107,41 @@
 - **Article qui traîne** : prix suggéré = −10 % (ou le prix conseillé s'il est plus bas), jamais sous le minimum.
 - **Rattachement d'un message** : on cherche d'abord parmi les articles en ligne ; les exemplaires identiques (même nom, même prix) sont acceptés.
 - **`IA_FACTICE=true`** : textes déterministes sans appel à l'API, uniquement pour la démo et les tests e2e. Ne pas activer en production.
-## Étape 4 : écran du jour et notifications push
+## Étape 4 : écran du jour et notifications push ✅
+
+### Fait
+- **Écran du jour** (page d'accueil), avec des cartes cliquables :
+  - colis à envoyer (aujourd'hui et en retard), ventes à confirmer, articles reçus à publier, messages et offres, mails non classés, commandes en attente ;
+  - litiges ouverts, avec un bandeau rouge dès qu'il y en a un ;
+  - articles en ligne depuis plus de 7 jours, avec un nouveau prix suggéré ;
+  - CA, marge et ventes de la semaine comparés à la semaine précédente (arrêtée au même jour) ;
+  - objectif de ventes du jour (configurable, 3 par défaut).
+- **PWA** : manifeste, icônes (générées par `frontend/scripts/generer_icones.py`, dont une version « maskable » et l'icône Apple), service worker. L'app s'installe sur l'écran d'accueil.
+- **Web Push** (VAPID, `pywebpush`) : nouvelle vente, nouveau litige, nouvelle offre, et rappel à 9 h (heure de Paris) des colis du jour et en retard. Chaque type peut être activé ou désactivé. Les appareils expirés (404/410) sont supprimés automatiquement. Les notifications sont envoyées après l'enregistrement du mail : un échec d'envoi ne casse jamais le traitement.
+- **Paramètres → Notifications** : bouton « Activer les notifications sur cet appareil », liste des appareils abonnés, notification de test, et explication pour iPhone (le bouton reste désactivé tant que l'app n'est pas installée).
+- **Qualité (section 10)** :
+  - sauvegarde complète en zip (Excel + base en JSON sans secrets + fichiers du volume) ;
+  - démo `python -m app.cli seed-demo` (base vide uniquement) ;
+  - génération des clés `python -m app.cli vapid-keys`.
+
+### Tests
+- Backend : 132 tests. Couverture : format des clés VAPID, abonnement idempotent et notification de test, envoi après le commit sur une vente et un litige, préférences, suppression d'un abonnement expiré, rappel de 9 h, contenu de la sauvegarde (sans secrets), démo.
+- Frontend : lint, types, Vitest, build. Vérification dans le navigateur (bureau et iPhone simulé) : manifeste, service worker enregistré, onglet Notifications, téléchargement de la sauvegarde, écran du jour sur la démo.
+
+### À tester toi-même
+1. `python -m app.cli vapid-keys`, puis ajoute les 3 variables et redémarre.
+2. Sur ton iPhone : installe l'app sur l'écran d'accueil (sur l'URL Vercel en HTTPS), ouvre-la depuis l'icône, active les notifications et envoie une notification de test.
+3. Vérifie demain à 9 h que le rappel des colis arrive (s'il y a des colis à déposer).
+
+### Décisions prises (étape 4)
+- **Pas de cache hors ligne** dans le service worker : les données doivent toujours être fraîches. Le gestionnaire `fetch` sert seulement à rendre l'app installable.
+- **Rappel de 9 h** : envoyé seulement s'il y a des colis du jour ou en retard (pas de notification « rien à faire »).
+- **Sauvegarde** : génération dans un fichier temporaire supprimé après le téléchargement ; les tables de session et de tentatives de connexion sont exclues, ainsi que le hash du mot de passe et le mot de passe IMAP chiffré.
+
+## État général
+
+Les 4 étapes du cahier des charges sont faites. Ce qui reste à valider avec tes vraies données :
+1. **Mails Vinted réels** : dépose des `.eml` dans `backend/fixtures/emails/<type>/`. Les règles initiales sont des suppositions, testées seulement sur des mails synthétiques.
+2. **Bordereaux réels** : le format 10x15 met la page entière à l'échelle ; il faudra peut-être recadrer sur l'étiquette.
+3. **Notifications sur iPhone** : nécessitent l'URL HTTPS (Vercel) et l'app installée.
+4. **Qualité des textes de l'IA** : à juger sur tes articles, puis ajuster les prompts dans `backend/app/prompts/`.

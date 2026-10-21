@@ -27,7 +27,7 @@ from app.models.enums import (
 from app.services import classifieur, rapprochement, storage
 from app.services.email_parser import MailLu, PieceJointeBrute, liens_html, re_liens
 from app.services.marques import normaliser
-from app.services.notifications import notifier
+from app.services.notifications import envoyer_en_attente, notifier
 from app.services.statuts import changer_statut
 
 DELAI_ENVOI_JOURS_OUVRES = 5  # délai Vinted pour expédier après une vente
@@ -76,6 +76,7 @@ def enregistrer_mail(db: Session, mail: MailLu) -> EmailVinted | None:
     if resultat.type:
         appliquer(db, email)
     db.commit()
+    envoyer_en_attente(db)
     return email
 
 
@@ -107,7 +108,7 @@ def _vente(db: Session, email: EmailVinted, article: Article | None) -> None:
         choix = rapprochement.choix_automatique(liste)
         if choix is None:
             email.statut_traitement = StatutTraitementEmail.NOUVEAU  # -> « Ventes à confirmer »
-            notifier("vente", "Nouvelle vente à confirmer", "/ventes")
+            notifier(db, "vente", "Nouvelle vente à confirmer", "/ventes", corps=d.get("titre_article") or "")
             return
         article = db.get(Article, choix.article_id)
         assert article is not None
@@ -153,7 +154,9 @@ def confirmer_vente(db: Session, email: EmailVinted, article: Article, auto: boo
     email.statut_traitement = StatutTraitementEmail.TRAITE
     # Le mail de vente peut contenir directement le bordereau.
     _rattacher_bordereau(db, envoi, email)
-    notifier("vente", f"Vendu : {article.nom}", f"/stock/{article.id}")
+    notifier(
+        db, "vente", f"Vendu : {article.nom}", f"/stock/{article.id}", corps=f"{prix} €".replace(".", ",")
+    )
     return vente
 
 
@@ -318,7 +321,13 @@ def _litige(db: Session, email: EmailVinted, article: Article | None) -> None:
             db, d.get("titre_article"), [StatutArticle.VENDU, StatutArticle.ENVOYE, StatutArticle.LIVRE]
         )
     # Même non rattaché, un litige est signalé tout de suite.
-    notifier("litige", "Nouveau litige", f"/stock/{article.id}" if article else "/mails")
+    notifier(
+        db,
+        "litige",
+        "Nouveau litige",
+        f"/stock/{article.id}" if article else "/mails",
+        corps=article.nom if article else "",
+    )
     if article is None:
         email.statut_traitement = StatutTraitementEmail.NOUVEAU
         return
@@ -352,7 +361,14 @@ def _message(db: Session, email: EmailVinted, article: Article | None) -> None:
     elif article is not None:
         existant.article_id = article.id
     if email.type_detecte == TypeEmail.OFFRE:
-        notifier("offre", "Nouvelle offre", "/messages")
+        notifier(
+            db,
+            "offre",
+            "Nouvelle offre"
+            + (f" de {d['montant_offre']} €".replace(".", ",") if d.get("montant_offre") else ""),
+            "/messages",
+            corps=article.nom if article else "",
+        )
     email.article_id = article.id if article else None
     email.statut_traitement = StatutTraitementEmail.TRAITE
 

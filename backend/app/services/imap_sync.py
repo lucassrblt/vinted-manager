@@ -21,6 +21,7 @@ from app.logging import log
 from app.models import Parametres, SyncLog
 from app.services import crypto
 from app.services.email_parser import lire_mail
+from app.services.notifications import annuler_en_attente
 from app.services.traitement import enregistrer_mail
 
 PREMIERE_SYNCHRO_JOURS = 30
@@ -187,6 +188,7 @@ def synchroniser(db: Session, params: Parametres, fabrique: FabriqueClient = _cl
                         nouveaux += 1
                 except Exception as exc:  # un mail illisible ne bloque pas les autres
                     db.rollback()
+                    annuler_en_attente(db)
                     erreurs.append(f"Mail {uid.decode(errors='ignore')} : {type(exc).__name__}")
                     log.warning(
                         "sync_mail_erreur", uid=uid.decode(errors="ignore"), erreur=type(exc).__name__

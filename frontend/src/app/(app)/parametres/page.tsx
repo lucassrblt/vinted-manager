@@ -1,18 +1,19 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
+import { Download, Loader2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { EnTetePage, LignesSquelette } from "@/components/commun";
 import { ConfigurationImap } from "@/components/mails/config-imap";
+import { ParametresNotifications } from "@/components/parametres/notifications";
 import { Champ } from "@/components/stock/dialog-article";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { api } from "@/lib/api";
+import { api, telecharger } from "@/lib/api";
 import { saisieVersDecimal } from "@/lib/format";
 import { useParametres } from "@/lib/queries";
 import type { Parametres } from "@/lib/types";
@@ -119,9 +120,8 @@ function ContenuParametres() {
         <TabsList>
           <TabsTrigger value="general">Général</TabsTrigger>
           <TabsTrigger value="mails">Mails</TabsTrigger>
-          <TabsTrigger value="notifications" disabled>
-            Notifications (étape 4)
-          </TabsTrigger>
+          <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="sauvegarde">Sauvegarde</TabsTrigger>
         </TabsList>
         <TabsContent value="general" className="mt-5">
           {!data ? (
@@ -168,7 +168,45 @@ function ContenuParametres() {
         <TabsContent value="mails" className="mt-5">
           <ConfigurationImap />
         </TabsContent>
+        <TabsContent value="notifications" className="mt-5">
+          <ParametresNotifications />
+        </TabsContent>
+        <TabsContent value="sauvegarde" className="mt-5">
+          <Sauvegarde />
+        </TabsContent>
       </Tabs>
     </>
+  );
+}
+
+function Sauvegarde() {
+  const [encours, setEncours] = useState(false);
+  return (
+    <section className="max-w-2xl space-y-4 rounded-xl border bg-card p-5">
+      <div>
+        <h2 className="font-medium">Sauvegarde complète</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Un zip avec l&apos;export Excel (même structure que ton fichier d&apos;origine), toute la base en JSON (sans
+          mots de passe) et les fichiers : preuves d&apos;achat, bordereaux, pièces jointes des mails.
+        </p>
+      </div>
+      <Button
+        onClick={async () => {
+          setEncours(true);
+          try {
+            await telecharger("/backup/complet.zip");
+            toast.success("Sauvegarde téléchargée");
+          } catch (e) {
+            toast.error((e as Error).message);
+          } finally {
+            setEncours(false);
+          }
+        }}
+        disabled={encours}
+      >
+        {encours ? <Loader2 className="animate-spin" /> : <Download />}
+        Télécharger la sauvegarde complète
+      </Button>
+    </section>
   );
 }
