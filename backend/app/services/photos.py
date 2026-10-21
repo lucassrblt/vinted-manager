@@ -204,6 +204,9 @@ def generer_photo(
 
 def _marquer_erreur(db: Session, cible: PhotoArticle | PhotoVariante, exc: Exception) -> None:
     db.rollback()
+    if db.get(type(cible), cible.id) is None:
+        log.info("photo_supprimee_pendant_generation", id=cible.id)  # article supprimé entre-temps
+        return
     if isinstance(exc, replicate_client.ErreurReplicate):
         message = str(exc)
     else:  # erreur inattendue : la photo est marquée, les autres continuent
@@ -218,9 +221,18 @@ def tache_generation(photo_ids: list[int], premium: bool = False) -> None:
     lumiere = random.choice(LUMIERES)  # même lumière pour toutes les photos d'un même lot
     with SessionLocal() as db:
         params = db.get(Parametres, 1) or Parametres(id=1)
-        for photo in db.scalars(
-            select(PhotoArticle).where(PhotoArticle.id.in_(photo_ids)).order_by(PhotoArticle.ordre)
-        ):
+        ordre = (
+            db.execute(
+                select(PhotoArticle.id).where(PhotoArticle.id.in_(photo_ids)).order_by(PhotoArticle.ordre)
+            )
+            .scalars()
+            .all()
+        )
+        for photo_id in ordre:
+            db.expire_all()
+            photo = db.get(PhotoArticle, photo_id)
+            if photo is None:
+                continue  # article supprimé pendant la génération : on n'appelle pas l'API pour rien
             try:
                 generer_photo(db, photo, params, lumiere, premium)
             except Exception as exc:

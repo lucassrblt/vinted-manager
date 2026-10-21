@@ -10,9 +10,10 @@ from fastapi.testclient import TestClient
 from PIL import Image
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_parametres
 from app.config import get_settings
-from app.models import Article
-from app.services import images, photos, replicate_client
+from app.models import Article, PhotoArticle
+from app.services import images, photos, replicate_client, storage
 
 
 def jpeg(
@@ -250,3 +251,35 @@ def test_comparaison_de_modeles(client: TestClient, db: Session, config: list[di
     assert client.get(f"/api/photos/{logo['id']}/fichier").status_code == 200
     comp = client.get(f"/api/articles/{a.id}/photos/comparaison").json()
     assert [len(lg["variantes"]) for lg in comp["lignes"]] == [2, 1]
+
+
+def test_article_supprime_pendant_la_retouche(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Photos supprimées pendant la génération (article supprimé) : la tâche ne plante pas et n'envoie
+    pas à l'API les photos qui n'existent plus."""
+    from app.db import SessionLocal
+
+    a = Article(nom="Test")
+    db.add(a)
+    db.flush()
+    ids = []
+    for i, t in enumerate(("devant", "dos")):
+        p = PhotoArticle(
+            article_id=a.id, type=t, ordre=i, fichier_original=storage.ecrire_fichier("t", f"{t}.jpg", jpeg())
+        )
+        db.add(p)
+        db.flush()
+        ids.append(p.id)
+    get_parametres(db).photo_fond = storage.ecrire_fichier("t", "fond.jpg", jpeg())
+    db.commit()
+    appels = []
+
+    def faux(modele: str, prompt: str, imgs: list[tuple[str, bytes]]) -> tuple[bytes, str]:
+        appels.append(modele)
+        with SessionLocal() as autre:  # la photo suivante est supprimée pendant le premier appel
+            autre.delete(autre.get(PhotoArticle, ids[1]))
+            autre.commit()
+        return jpeg(), "pred"
+
+    monkeypatch.setattr(replicate_client, "generer", faux)
+    photos.tache_generation(ids)
+    assert len(appels) == 1
