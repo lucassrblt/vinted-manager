@@ -9,9 +9,9 @@ from sqlalchemy import func, or_, select
 
 from app.api.deps import Db, get_parametres
 from app.db import utcnow
-from app.models import Article, Batch, EmailVinted, Envoi
-from app.models.enums import StatutArticle, StatutEnvoi, StatutTraitementEmail, TypeEmail
-from app.services import stats
+from app.models import Article, Batch, EmailVinted, Envoi, Message
+from app.models.enums import StatutArticle, StatutEnvoi, StatutMessage, StatutTraitementEmail, TypeEmail
+from app.services import prix_conseille, stats
 
 router = APIRouter(tags=["systeme"])
 
@@ -92,6 +92,7 @@ def ecran_du_jour(db: Db) -> dict[str, object]:
         if a.statut == StatutArticle.EN_LIGNE and a.date_publication and a.date_publication <= seuil
     ]
     debut_semaine = aujourdhui - timedelta(days=aujourdhui.weekday())
+    vendus = [a for a in articles if stats.est_vendu(a)]
 
     def semaine(du: date, au: date) -> stats.Kpis:
         return stats.kpis(articles, params, du, au)
@@ -111,9 +112,16 @@ def ecran_du_jour(db: Db) -> dict[str, object]:
                 "taille": a.taille,
                 "prix_vente": stats.prix_vente(a),
                 "jours_en_ligne": (maintenant - a.date_publication).days if a.date_publication else None,
+                "prix_suggere": prix_conseille.nouveau_prix_article_lent(
+                    a, prix_conseille.calculer(a, vendus, params), params
+                ),
             }
             for a in sorted(lents, key=lambda a: a.date_publication or datetime.min)
         ],
+        "messages_a_traiter": db.scalar(
+            select(func.count(Message.id)).where(Message.statut == StatutMessage.A_TRAITER)
+        )
+        or 0,
         "semaine": Comparaison(
             ca=cette.ca_encaisse,
             marge=cette.marge_realisee,

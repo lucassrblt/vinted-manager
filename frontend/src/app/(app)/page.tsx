@@ -7,6 +7,7 @@ import {
   ArrowUpRight,
   Clock,
   Inbox,
+  MessageCircle,
   PackageCheck,
   PackageOpen,
   Receipt,
@@ -92,7 +93,7 @@ export default function EcranDuJourPage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <CarteKpi
               libelle="Colis à envoyer"
               valeur={d.envois.a_preparer}
@@ -113,6 +114,13 @@ export default function EcranDuJourPage() {
               icone={Receipt}
               href="/ventes"
               detail={d.ventes_a_confirmer ? "un clic pour choisir l'article" : "tout est rapproché"}
+            />
+            <CarteKpi
+              libelle="Messages et offres"
+              valeur={d.messages_a_traiter}
+              icone={MessageCircle}
+              href="/messages"
+              detail={d.messages_a_traiter ? "réponse suggérée prête en un clic" : "rien à répondre"}
             />
             <CarteKpi
               libelle="Mails non classés"
@@ -186,7 +194,7 @@ export default function EcranDuJourPage() {
             <div className="border-b px-4 py-3">
               <h2 className="text-sm font-semibold">Articles en ligne depuis longtemps</h2>
               <p className="text-xs text-muted-foreground">
-                La suggestion de nouveau prix arrivera avec l&apos;étape 3.
+                Avec une suggestion de nouveau prix (−10 %, jamais sous le coefficient minimal).
               </p>
             </div>
             {d.articles_lents.length === 0 ? (
@@ -200,7 +208,16 @@ export default function EcranDuJourPage() {
                         {a.nom}
                         {a.taille && <span className="font-normal text-muted-foreground"> · {a.taille}</span>}
                       </span>
-                      <span className="text-sm tabular-nums">{formatEuros(a.prix_vente)}</span>
+                      <span className="text-sm tabular-nums">
+                        {a.prix_suggere ? (
+                          <>
+                            <span className="text-muted-foreground line-through">{formatEuros(a.prix_vente)}</span>{" "}
+                            <span className="font-medium text-brand">{formatEuros(a.prix_suggere)}</span>
+                          </>
+                        ) : (
+                          formatEuros(a.prix_vente)
+                        )}
+                      </span>
                       <span className="w-14 text-right text-xs text-amber-700 tabular-nums dark:text-amber-400">
                         {a.jours_en_ligne} j
                       </span>

@@ -29,7 +29,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { api, telecharger } from "@/lib/api";
 import { formatCoefficient, formatDate, formatDateHeure, formatDelai, formatEuros, formatPourcent } from "@/lib/format";
 import { useArticle, useBatches, useChangerStatut, useInvaliderStock, useModifierArticle } from "@/lib/queries";
@@ -152,16 +151,11 @@ export default function FicheArticle() {
             </div>
           </div>
           <div className="flex shrink-0 gap-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span tabIndex={0}>
-                  <Button variant="outline" disabled>
-                    <Megaphone /> Créer l&apos;annonce
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>Disponible à l&apos;étape 3 (annonces IA)</TooltipContent>
-            </Tooltip>
+            <Button variant="outline" asChild>
+              <Link href={`/annonces/${a.id}`}>
+                <Megaphone /> {a.titre_annonce ? "Voir l'annonce" : "Créer l'annonce"}
+              </Link>
+            </Button>
             <Button variant="ghost" size="icon" aria-label="Supprimer l'article" onClick={() => setSuppression(true)}>
               <Trash2 />
             </Button>

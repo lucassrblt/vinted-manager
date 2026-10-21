@@ -74,3 +74,8 @@ def prix_achat_net(prix_brut: Decimal | None, remise: Decimal | None) -> Decimal
     if prix_brut is None:
         return None
     return arrondi_euros(prix_brut - (remise or Decimal("0")))
+
+
+def nombre_fr(valeur: Decimal) -> str:
+    """2.00 -> « 2 », 2.50 -> « 2,5 » (pour les textes affichés)."""
+    return format(valeur.normalize(), "f").replace(".", ",")

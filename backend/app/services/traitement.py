@@ -278,15 +278,32 @@ def _suivi_colis(db: Session, email: EmailVinted, article: Article | None) -> No
 # --- Litiges et messages ----------------------------------------------------------------------
 
 
-def _article_par_titre(db: Session, titre: str | None, statuts: list[StatutArticle]) -> Article | None:
+def _article_par_titre(
+    db: Session, titre: str | None, statuts: list[StatutArticle], doublons_ok: bool = False
+) -> Article | None:
+    """Article dont le nom correspond nettement au titre. `doublons_ok` : si les meilleurs candidats sont
+    des exemplaires identiques (même nom, même prix), le premier convient (utile pour un message)."""
     if not titre:
         return None
-    articles = db.scalars(select(Article).where(Article.statut.in_([s.value for s in statuts]))).all()
+    articles = db.scalars(
+        select(Article).where(Article.statut.in_([s.value for s in statuts])).order_by(Article.id)
+    ).all()
     scores = sorted(
         ((rapprochement.score_titre(titre, a), a) for a in articles), key=lambda x: x[0], reverse=True
     )
-    if scores and scores[0][0] >= SEUIL_TITRE and (len(scores) == 1 or scores[0][0] - scores[1][0] >= 10):
-        return scores[0][1]
+    if not scores or scores[0][0] < SEUIL_TITRE:
+        return None
+    meilleur = scores[0][1]
+    if len(scores) == 1 or scores[0][0] - scores[1][0] >= 10:
+        return meilleur
+    if doublons_ok:
+        ex_aequo = [a for sc, a in scores if scores[0][0] - sc < 10]
+        identiques = all(
+            normaliser(a.nom) == normaliser(meilleur.nom) and a.prix_vente_cible == meilleur.prix_vente_cible
+            for a in ex_aequo
+        )
+        if identiques:
+            return meilleur
     return None
 
 
@@ -314,12 +331,11 @@ def _litige(db: Session, email: EmailVinted, article: Article | None) -> None:
 
 def _message(db: Session, email: EmailVinted, article: Article | None) -> None:
     d = email.donnees_extraites or {}
-    if article is None:
-        article = _article_par_titre(
-            db,
-            d.get("titre_article"),
-            [StatutArticle.EN_LIGNE, StatutArticle.RECU_A_PUBLIER, StatutArticle.VENDU],
-        )
+    # Un message porte presque toujours sur un article en ligne : on cherche d'abord là.
+    for statuts in ([StatutArticle.EN_LIGNE], [StatutArticle.RECU_A_PUBLIER, StatutArticle.VENDU]):
+        if article is not None:
+            break
+        article = _article_par_titre(db, d.get("titre_article"), statuts, doublons_ok=True)
     existant = db.scalar(select(Message).where(Message.email_id == email.id))
     if existant is None:
         db.add(

@@ -55,6 +55,10 @@ class ArticleUpdate(BaseModel):
     notes: str | None = None
     titre_annonce: str | None = None
     description_annonce: str | None = None
+    mots_cles_annonce: str | None = None
+    modele: str | None = None
+    matiere: str | None = None
+    defauts: str | None = None
     mesures: dict[str, Any] | None = None
 
 
@@ -87,6 +91,10 @@ class ArticleOut(BaseModel):
     notes: str | None
     titre_annonce: str | None
     description_annonce: str | None
+    mots_cles_annonce: str | None
+    modele: str | None
+    matiere: str | None
+    defauts: str | None
     mesures: dict[str, Any] | None
     created_at: datetime
     updated_at: datetime

@@ -51,8 +51,13 @@ class Article(TimestampMixin, Base):
     date_livraison: Mapped[datetime | None]
     litige: Mapped[bool] = mapped_column(default=False)
     notes: Mapped[str | None] = mapped_column(Text)
+    # Fiche annonce (étape 3)
+    modele: Mapped[str | None] = mapped_column(String(120))
+    matiere: Mapped[str | None] = mapped_column(String(120))
+    defauts: Mapped[str | None] = mapped_column(Text)
     titre_annonce: Mapped[str | None] = mapped_column(String(120))
     description_annonce: Mapped[str | None] = mapped_column(Text)
+    mots_cles_annonce: Mapped[str | None] = mapped_column(Text)
     mesures: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)
 

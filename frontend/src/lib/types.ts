@@ -32,6 +32,10 @@ export interface Article {
   notes: string | null;
   titre_annonce: string | null;
   description_annonce: string | null;
+  mots_cles_annonce: string | null;
+  modele: string | null;
+  matiere: string | null;
+  defauts: string | null;
   mesures: Record<string, string | number> | null;
   created_at: string;
   updated_at: string;
@@ -235,7 +239,9 @@ export interface EcranDuJour {
     taille: string | null;
     prix_vente: Decimal | null;
     jours_en_ligne: number | null;
+    prix_suggere: Decimal | null;
   }[];
+  messages_a_traiter: number;
   semaine: {
     ca: Decimal;
     marge: Decimal;
@@ -371,4 +377,87 @@ export interface SyncLog {
   fin: string | null;
   nb_mails: number;
   erreur: string | null;
+}
+
+// --- Étape 3 : annonces, prix conseillé, messages ------------------------------------------
+
+export interface PrixConseille {
+  prix: Decimal | null;
+  estimation: boolean;
+  base: string | null;
+  nb_ventes: number;
+  mediane: Decimal | null;
+  fourchette_basse: Decimal | null;
+  fourchette_haute: Decimal | null;
+  delai_moyen_jours: number | null;
+  coefficient: Decimal | null;
+  sous_objectif_releve: boolean;
+  raisonnement: string;
+}
+
+export interface FicheAnnonce {
+  article: Article;
+  prix_conseille: PrixConseille;
+  modele_id: number | null;
+  ia_disponible: boolean;
+}
+
+export interface AnnonceGeneree {
+  titre: string;
+  description: string;
+  mots_cles: string[];
+}
+
+export interface AnalyseOffre {
+  decision: "accepter" | "contre_proposer" | "refuser";
+  montant_offre: Decimal;
+  prix_affiche: Decimal | null;
+  prix_plancher: Decimal | null;
+  montant_propose: Decimal | null;
+  marge_si_accepte: Decimal | null;
+  coefficient_si_accepte: Decimal | null;
+  marge_proposee: Decimal | null;
+  explication: string;
+}
+
+export interface MessageAcheteur {
+  id: number;
+  type: "message" | "offre";
+  acheteur: string | null;
+  article_id: number | null;
+  extrait: string | null;
+  montant_offre: Decimal | null;
+  reponse_suggeree: string | null;
+  reponse_finale: string | null;
+  statut: "a_traiter" | "repondu" | "ignore";
+  created_at: string;
+  analyse: AnalyseOffre | null;
+}
+
+export interface GroupeMessages {
+  article: {
+    id: number;
+    nom: string;
+    taille: string | null;
+    statut: Statut;
+    prix_vente: Decimal | null;
+    prix_achat_net: Decimal | null;
+  } | null;
+  messages: MessageAcheteur[];
+}
+
+export interface ModeleAnnonce {
+  id: number;
+  nom: string;
+  categorie: string | null;
+  structure_titre: string | null;
+  structure_description: string | null;
+  mots_cles: string | null;
+}
+
+export interface ModeleReponse {
+  id: number;
+  nom: string;
+  contexte: string;
+  texte: string;
 }

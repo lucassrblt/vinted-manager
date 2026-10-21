@@ -77,5 +77,34 @@
 - **Notifications** de vente, litige et offre : branchées sur un point d'entrée unique (`services/notifications.py`), qui se contente de journaliser jusqu'à l'étape 4 (push).
 - **Annulation d'une vente** impossible une fois le colis déposé.
 - **Annulation d'une vente auto-rapprochée** : l'article repasse `en_ligne` et le mail revient dans « Ventes à confirmer ».
-## Étape 3 : annonces et messages avec l'IA (à venir)
-## Étape 4 : écran du jour et notifications push (à venir)
+## Étape 3 : annonces et messages avec l'IA ✅
+
+### Fait
+- **IA** : SDK Anthropic, modèle `ANTHROPIC_MODEL` (défaut `claude-haiku-5-5`), clé `ANTHROPIC_API_KEY`. Les prompts système sont dans `backend/app/prompts/` (`annonce_systeme.txt`, `reponse_message.txt`) et relus à chaque appel. La sortie JSON est imposée par schéma. Chaque erreur a un message clair en français : clé absente ou refusée, limite de débit, crédit épuisé, service surchargé, réseau, refus du modèle, réponse coupée.
+- **Création d'annonce** (page Annonces, ou bouton sur la fiche article) :
+  - formulaire prérempli (marque, modèle, catégorie, taille, couleur, état, matière, défauts, mesures, modèle d'annonce) ;
+  - titre de 60 caractères maximum (coupé proprement si l'IA dépasse), description, mots-clés ;
+  - boutons Régénérer, Copier le titre, Copier la description, Copier tout, Marquer comme publié (passe l'article en ligne avec la date et l'heure) ;
+  - le prompt interdit d'affirmer une information absente de la fiche ; la fiche saisie est enregistrée sur l'article, même si l'IA échoue.
+- **Prix conseillé** (backend, jamais par l'IA) : ventes de même marque et catégorie, sinon même catégorie, sinon même marque (3 ventes minimum) ; médiane, fourchette (quartiles dès 4 ventes), délai moyen, contrôle du coefficient (prix relevé si sous l'objectif) ; arrondi configurable ; raisonnement affiché. Sinon, une estimation signalée comme telle.
+- **Messages et offres** : regroupés par article. Pour une offre, la décision (accepter, contre-proposer avec montant, refuser poliment) est calculée par le backend, avec la marge et le coefficient résultants ; l'IA rédige la réponse en respectant cette décision. Réponse modifiable, copiable, « marquer répondu » ou ignorer. Rien n'est jamais envoyé automatiquement.
+- **Modèles** d'annonce et de réponse éditables (page Modèles), avec un jeu par défaut installé au premier démarrage.
+- **Écran du jour** : carte « Messages et offres » et prix suggéré pour les articles qui traînent.
+
+### Tests
+- Backend : 123 tests. Couverture : arrondi, prix conseillé (niveaux, médiane, raisonnement, relèvement, estimation), analyse d'offre, appel IA avec un client simulé (prompt, schéma, titre coupé), mapping des erreurs, refus et clé absente, parcours annonce → publié, conservation de la fiche quand l'IA échoue, messages groupés, suggestion, CRUD des modèles, rattachement d'un message à un exemplaire en double.
+- E2E Playwright : connexion → import → création d'annonce → marquer publié (backend lancé avec `IA_FACTICE=true`).
+
+### À tester toi-même
+1. Ajoute `ANTHROPIC_API_KEY` dans `.env`, relance, puis ouvre Annonces : choisis un article, complète l'état (et les défauts s'il y en a), clique « Générer l'annonce ».
+2. Vérifie que la description n'invente rien (matière, authenticité…) et ajuste `backend/app/prompts/annonce_systeme.txt` si besoin.
+3. Messages : clique « Suggérer une réponse » sur une offre et vérifie la marge affichée.
+
+### Décisions prises (étape 3)
+- **Effort `low`** pour les rédactions (tâches courtes : plus rapide et moins cher sur Haiku).
+- **Décision sur les offres** : accepter si l'offre atteint le prix minimum (coefficient minimal, arrondi) et au moins 90 % du prix affiché ; refuser si elle est sous 70 % du minimum ; sinon contre-proposer à mi-chemin entre l'offre et le prix affiché, jamais sous le minimum.
+- **Estimation sans historique** : coefficient minimal + 0,5 (soit 2,5).
+- **Article qui traîne** : prix suggéré = −10 % (ou le prix conseillé s'il est plus bas), jamais sous le minimum.
+- **Rattachement d'un message** : on cherche d'abord parmi les articles en ligne ; les exemplaires identiques (même nom, même prix) sont acceptés.
+- **`IA_FACTICE=true`** : textes déterministes sans appel à l'API, uniquement pour la démo et les tests e2e. Ne pas activer en production.
+## Étape 4 : écran du jour et notifications push

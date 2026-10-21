@@ -1,5 +1,8 @@
 import {
+  BookText,
   Boxes,
+  Megaphone,
+  MessageCircle,
   FileSpreadsheet,
   Filter,
   Home,
@@ -19,7 +22,6 @@ export interface LienNav {
   icone: LucideIcon;
 }
 
-// Les pages des étapes 3 et 4 (annonces, messages) seront ajoutées ici.
 export const NAVIGATION: { groupe?: string; liens: LienNav[] }[] = [
   { liens: [{ href: "/", libelle: "Aujourd'hui", icone: Home }] },
   {
@@ -27,6 +29,7 @@ export const NAVIGATION: { groupe?: string; liens: LienNav[] }[] = [
     liens: [
       { href: "/envois", libelle: "Envois", icone: Truck },
       { href: "/ventes", libelle: "Ventes", icone: Receipt },
+      { href: "/messages", libelle: "Messages", icone: MessageCircle },
       { href: "/mails", libelle: "Mails", icone: Inbox },
     ],
   },
@@ -34,6 +37,7 @@ export const NAVIGATION: { groupe?: string; liens: LienNav[] }[] = [
     groupe: "Stock",
     liens: [
       { href: "/stock", libelle: "Articles", icone: Boxes },
+      { href: "/annonces", libelle: "Annonces", icone: Megaphone },
       { href: "/batches", libelle: "Batches", icone: Layers },
       { href: "/sourcing", libelle: "Sourcing", icone: Search },
     ],
@@ -42,6 +46,7 @@ export const NAVIGATION: { groupe?: string; liens: LienNav[] }[] = [
     groupe: "Gestion",
     liens: [
       { href: "/compta", libelle: "Compta", icone: PiggyBank },
+      { href: "/modeles", libelle: "Modèles", icone: BookText },
       { href: "/regles", libelle: "Règles des mails", icone: Filter },
       { href: "/import", libelle: "Import / export", icone: FileSpreadsheet },
       { href: "/parametres", libelle: "Paramètres", icone: Settings },

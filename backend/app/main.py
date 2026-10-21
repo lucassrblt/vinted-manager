@@ -7,11 +7,24 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app import scheduler
-from app.api import articles, auth, batches, compta, import_export, mails, preuves, sourcing, systeme, ventes
+from app.api import (
+    annonces,
+    articles,
+    auth,
+    batches,
+    compta,
+    import_export,
+    mails,
+    preuves,
+    sourcing,
+    systeme,
+    ventes,
+)
 from app.api.deps import session_requise
 from app.config import get_settings
 from app.db import SessionLocal
 from app.logging import configurer_logs, log
+from app.seed.modeles import installer_modeles
 from app.seed.regles import installer_regles
 
 configurer_logs(get_settings().log_level)
@@ -21,6 +34,7 @@ configurer_logs(get_settings().log_level)
 async def cycle_de_vie(_: FastAPI) -> AsyncIterator[None]:
     with SessionLocal() as db:
         installer_regles(db)
+        installer_modeles(db)
     scheduler.demarrer()
     yield
     scheduler.arreter()
@@ -61,7 +75,7 @@ publique = APIRouter(prefix="/api")
 publique.include_router(auth.router)
 
 protegee = APIRouter(prefix="/api", dependencies=[Depends(session_requise)])
-for module in (articles, batches, preuves, import_export, compta, sourcing, systeme, mails, ventes):
+for module in (annonces, articles, batches, preuves, import_export, compta, sourcing, systeme, mails, ventes):
     protegee.include_router(module.router)
 
 app.include_router(publique)

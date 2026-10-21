@@ -160,3 +160,12 @@ def test_rapprochement_distingue_les_couleurs(db: Session, regles: None) -> None
     )
     email = _recevoir(db, brut)
     assert email.statut_traitement == "traite" and email.article_id == bleu.id
+
+
+def test_message_sur_article_en_double(db: Session, regles: None) -> None:
+    """Exemplaires identiques en ligne + même article déjà vendu : le message va à un exemplaire en ligne."""
+    en_ligne = [_article(db, "Bonnet Ralph Lauren - Blanc", "16") for _ in range(2)]
+    _article(db, "Bonnet Ralph Lauren - Blanc", "16", statut="vendu")
+    _recevoir(db, ms.MESSAGE)
+    message = db.scalar(select(Message))
+    assert message is not None and message.article_id == en_ligne[0].id
