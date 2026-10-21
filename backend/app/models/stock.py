@@ -136,3 +136,19 @@ class PhotoArticle(TimestampMixin, Base):
     )  # USD, prix à 3 décimales
     erreur: Mapped[str | None] = mapped_column(Text)
     updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)
+
+
+class PhotoVariante(TimestampMixin, Base):
+    """Résultat d'un modèle pour une photo, lors d'une comparaison de modèles."""
+
+    __tablename__ = "photo_variante"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    photo_id: Mapped[int] = mapped_column(ForeignKey("photo_article.id", ondelete="CASCADE"), index=True)
+    modele: Mapped[str] = mapped_column(String(120))
+    statut: Mapped[str] = mapped_column(String(20), default="en_cours")  # en_cours | genere | erreur
+    fichier: Mapped[str | None] = mapped_column(String(500))
+    disposition: Mapped[str | None] = mapped_column(Text)
+    cout_estime: Mapped[Decimal] = mapped_column(Numeric(10, 4), default=Decimal("0"))
+    duree_secondes: Mapped[float | None]
+    erreur: Mapped[str | None] = mapped_column(Text)

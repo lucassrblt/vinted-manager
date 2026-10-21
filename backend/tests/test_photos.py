@@ -211,3 +211,42 @@ def test_parametres_modele(client: TestClient) -> None:
 def test_entree_gpt_image_2() -> None:
     e = replicate_client.entree_modele("openai/gpt-image-2:low", "p", ["u1", "u2"])
     assert e["quality"] == "low" and e["input_images"] == ["u1", "u2"] and e["aspect_ratio"] == "1152x1536"
+
+
+def test_comparaison_de_modeles(client: TestClient, db: Session, config: list[dict[str, Any]]) -> None:
+    a = _article(db)
+    client.post(
+        "/api/parametres/photos/fond", files={"fichier": ("t.jpg", jpeg(couleur="white"), "image/jpeg")}
+    )
+    for t in ("devant", "logo", "defaut"):
+        _deposer(client, a.id, t)
+    modeles = ["openai/gpt-image-2:low", "google/nano-banana-2"]
+    r = client.post(f"/api/articles/{a.id}/photos/comparer", json={"modeles": modeles})
+    assert r.status_code == 200 and len(r.json()) == 4  # 2 photos (sans le défaut) × 2 modèles
+    assert sorted({c["modele"] for c in config}) == sorted(modeles)
+    # Même disposition pour tous les modèles d'une même photo : seule la qualité du modèle change
+    prompts_devant = [c["prompt"] for c in config if "front side up" in c["prompt"]]
+    assert len(prompts_devant) == 2 and prompts_devant[0] == prompts_devant[1]
+
+    comp = client.get(f"/api/articles/{a.id}/photos/comparaison").json()
+    assert comp["en_cours"] is False and comp["modeles"] == modeles
+    assert D(comp["cout_total"]) == D("0.158")  # 2 × (0,012 + 0,067)
+    ligne = next(lg for lg in comp["lignes"] if lg["photo"]["type"] == "logo")
+    nano = next(v for v in ligne["variantes"] if v["modele"] == "google/nano-banana-2")
+    assert client.get(f"/api/variantes/{nano['id']}/fichier").status_code == 200
+
+    r = client.post(f"/api/variantes/{nano['id']}/choisir", json={"defaut_pour_type": True})
+    assert r.json()["statut"] == "genere" and r.json()["version_choisie"] == "genere"
+    params = client.get("/api/parametres/photos").json()
+    assert params["modeles_par_type"]["logo"] == "google/nano-banana-2"
+    assert params["modeles_par_type"]["devant"] == "openai/gpt-image-2:low"
+
+    # Une nouvelle comparaison remplace l'ancienne, sans supprimer le fichier retenu
+    client.post(
+        f"/api/articles/{a.id}/photos/comparer",
+        json={"modeles": ["openai/gpt-image-2:low"], "types": ["logo"]},
+    )
+    logo = next(p for p in client.get(f"/api/articles/{a.id}/photos").json()["photos"] if p["type"] == "logo")
+    assert client.get(f"/api/photos/{logo['id']}/fichier").status_code == 200
+    comp = client.get(f"/api/articles/{a.id}/photos/comparaison").json()
+    assert [len(lg["variantes"]) for lg in comp["lignes"]] == [2, 1]

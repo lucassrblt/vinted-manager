@@ -8,6 +8,7 @@ Principes :
 """
 
 import random
+import time
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -15,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.db import SessionLocal
 from app.logging import log
-from app.models import Article, Parametres, PhotoArticle
+from app.models import Article, Parametres, PhotoArticle, PhotoVariante
 from app.services import images, replicate_client, storage
 
 TYPES = {
@@ -34,6 +35,15 @@ TYPES_RETOUCHES = ("devant", "dos", "etiquette", "logo", "detail")
 # les étiquettes et les logos, pour ~0,012 $ la photo. Le bouton « haute qualité » passe par
 # Parametres.modele_photos (Nano Banana 2 par défaut).
 MODELES_PAR_DEFAUT = {t: "openai/gpt-image-2:low" for t in TYPES_RETOUCHES}
+
+
+# Modèles proposés dans la comparaison (FLUX.2 et Qwen écartés : fond et vêtement inventés lors des essais).
+MODELES_COMPARAISON = [
+    "openai/gpt-image-2:low",
+    "openai/gpt-image-2:medium",
+    "bytedance/seedream-5-lite",
+    "google/nano-banana-2",
+]
 
 
 def modele_pour(params: Parametres, type_photo: str, premium: bool = False) -> str:
@@ -134,22 +144,16 @@ def construire_prompt(type_photo: str, article: Article, dispo: str, reference_c
     )
 
 
-def generer_photo(
-    db: Session, photo: PhotoArticle, params: Parametres, lumiere: str, premium: bool = False
-) -> None:
-    """Génère la version retouchée d'une photo (appel réseau, plusieurs secondes)."""
-    if photo.type == "defaut":
-        photo.statut, photo.version_choisie = "original", "original"
-        db.commit()
-        return
+def produire(
+    db: Session, photo: PhotoArticle, params: Parametres, modele: str, dispo: str
+) -> tuple[bytes, str]:
+    """Appelle le modèle pour une photo avec une disposition donnée. Renvoie (JPEG, id de prédiction)."""
     if not params.photo_fond:
         raise replicate_client.ErreurReplicate(
             "Ajoute d'abord la photo de ton tapis dans Paramètres → Photos (elle sert de fond à toutes les photos)."
         )
     article = db.get(Article, photo.article_id)
     assert article is not None
-    rng = random.Random()
-    photo.disposition = disposition(photo.type, rng, lumiere)
     entrees = [
         ("photo.jpg", storage.chemin_absolu(photo.fichier_original).read_bytes()),
         ("tapis.jpg", storage.chemin_absolu(params.photo_fond).read_bytes()),
@@ -164,20 +168,48 @@ def generer_photo(
         )
         if devant is not None:
             entrees.append(("devant.jpg", storage.chemin_absolu(devant.fichier_original).read_bytes()))
-    prompt = construire_prompt(photo.type, article, photo.disposition, reference_couleur=devant is not None)
-    modele = modele_pour(params, photo.type, premium)
+    prompt = construire_prompt(photo.type, article, dispo, reference_couleur=devant is not None)
     contenu, prediction_id = replicate_client.generer(modele, prompt, entrees)
+    return images.en_jpeg(contenu), prediction_id
+
+
+def prix(modele: str) -> Decimal:
+    return Decimal(str(replicate_client.PRIX_PAR_IMAGE.get(modele, 0.07)))
+
+
+def generer_photo(
+    db: Session, photo: PhotoArticle, params: Parametres, lumiere: str, premium: bool = False
+) -> None:
+    """Génère la version retouchée d'une photo (appel réseau, plusieurs secondes)."""
+    if photo.type == "defaut":
+        photo.statut, photo.version_choisie = "original", "original"
+        db.commit()
+        return
+    photo.disposition = disposition(photo.type, random.Random(), lumiere)
+    modele = modele_pour(params, photo.type, premium)
+    contenu, prediction_id = produire(db, photo, params, modele, photo.disposition)
     ancien = photo.fichier_genere
     photo.fichier_genere = storage.ecrire_fichier(
-        f"photos/article-{article.id}", f"{photo.type}-ia.jpg", images.en_jpeg(contenu)
+        f"photos/article-{photo.article_id}", f"{photo.type}-ia.jpg", contenu
     )
-    if ancien:
+    if ancien and not db.scalar(select(PhotoVariante.id).where(PhotoVariante.fichier == ancien)):
         storage.supprimer(ancien)
     photo.prediction_id = prediction_id
     photo.modele = modele
     photo.nb_generations += 1
-    photo.cout_estime += Decimal(str(replicate_client.PRIX_PAR_IMAGE.get(modele, 0.07)))
+    photo.cout_estime += prix(modele)
     photo.statut, photo.version_choisie, photo.erreur = "genere", "genere", None
+    db.commit()
+
+
+def _marquer_erreur(db: Session, cible: PhotoArticle | PhotoVariante, exc: Exception) -> None:
+    db.rollback()
+    if isinstance(exc, replicate_client.ErreurReplicate):
+        message = str(exc)
+    else:  # erreur inattendue : la photo est marquée, les autres continuent
+        log.exception("photo_erreur", id=cible.id)
+        message = f"Erreur inattendue ({type(exc).__name__}). Réessaie."
+    cible.statut, cible.erreur = "erreur", message
     db.commit()
 
 
@@ -191,12 +223,29 @@ def tache_generation(photo_ids: list[int], premium: bool = False) -> None:
         ):
             try:
                 generer_photo(db, photo, params, lumiere, premium)
-            except replicate_client.ErreurReplicate as exc:
-                db.rollback()
-                photo.statut, photo.erreur = "erreur", str(exc)
+            except Exception as exc:
+                _marquer_erreur(db, photo, exc)
+
+
+def tache_comparaison(variante_ids: list[int]) -> None:
+    """Tâche de fond : une variante par (photo, modèle). Pour une même photo, tous les modèles reçoivent
+    la même disposition, afin que la comparaison ne porte que sur le modèle."""
+    with SessionLocal() as db:
+        params = db.get(Parametres, 1) or Parametres(id=1)
+        for v in db.scalars(
+            select(PhotoVariante).where(PhotoVariante.id.in_(variante_ids)).order_by(PhotoVariante.id)
+        ):
+            photo = db.get(PhotoArticle, v.photo_id)
+            assert photo is not None
+            debut = time.monotonic()
+            try:
+                contenu, _ = produire(db, photo, params, v.modele, v.disposition or "")
+                nom = f"{photo.type}-{v.modele.replace('/', '-').replace(':', '-')}.jpg"
+                v.fichier = storage.ecrire_fichier(
+                    f"photos/article-{photo.article_id}/variantes", nom, contenu
+                )
+                v.statut, v.cout_estime, v.erreur = "genere", prix(v.modele), None
+                v.duree_secondes = round(time.monotonic() - debut, 1)
                 db.commit()
-            except Exception as exc:  # erreur inattendue : la photo est marquée, les autres continuent
-                log.exception("photo_erreur", photo_id=photo.id)
-                db.rollback()
-                photo.statut, photo.erreur = "erreur", f"Erreur inattendue ({type(exc).__name__}). Réessaie."
-                db.commit()
+            except Exception as exc:
+                _marquer_erreur(db, v, exc)

@@ -1,11 +1,13 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, Download, ImagePlus, Loader2, RefreshCw, Sparkles, Trash2, Wand2 } from "lucide-react";
+import { AlertCircle, Columns3, Download, ImagePlus, Loader2, RefreshCw, Sparkles, Trash2, Wand2 } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { toast } from "sonner";
 
+import { ComparaisonModeles } from "@/components/photos/comparaison-modeles";
 import { Button } from "@/components/ui/button";
 import { api, telecharger } from "@/lib/api";
 import { cn } from "@/lib/utils";
@@ -14,6 +16,7 @@ export type TypePhoto = "devant" | "dos" | "etiquette" | "logo" | "detail" | "de
 
 export interface PhotoArticle {
   id: number;
+  modele: string | null;
   type: TypePhoto;
   statut: "a_generer" | "en_cours" | "genere" | "erreur" | "original";
   version_choisie: "genere" | "original";
@@ -217,6 +220,7 @@ export function PhotosArticle({ articleId }: { articleId: number }) {
     staleTime: 60_000,
   });
   const rafraichir = () => qc.invalidateQueries({ queryKey: cle });
+  const [comparaison, setComparaison] = useState(false);
 
   const depot = useMutation({
     mutationFn: async (lots: { fichier: File; type: TypePhoto }[]) => {
@@ -334,6 +338,13 @@ export function PhotosArticle({ articleId }: { articleId: number }) {
         </Button>
         <Button
           variant="outline"
+          disabled={!photos.some((p) => p.type !== "defaut") || !config.data?.fond_defini}
+          onClick={() => setComparaison(true)}
+        >
+          <Columns3 /> Comparer les modèles
+        </Button>
+        <Button
+          variant="outline"
           disabled={!photos.length}
           onClick={() => telecharger(`/articles/${articleId}/photos.zip`).catch((e) => toast.error(e.message))}
         >
@@ -352,6 +363,12 @@ export function PhotosArticle({ articleId }: { articleId: number }) {
         Vérifie toujours la photo retouchée avant de publier : le vêtement doit être exactement le tien (couleur,
         étiquette, logo, usure).
       </p>
+      <ComparaisonModeles
+        articleId={articleId}
+        nbPhotos={photos.filter((p) => p.type !== "defaut").length}
+        ouvert={comparaison}
+        setOuvert={setComparaison}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 """Photos d'articles : dépôt, génération par l'IA (tâche de fond), choix de version, zip."""
 
 import io
+import random
 import zipfile
 from datetime import datetime
 from decimal import Decimal
@@ -14,7 +15,7 @@ from sqlalchemy import func, select
 from app.api.deps import Db, get_parametres
 from app.config import get_settings
 from app.db import utcnow
-from app.models import Article, PhotoArticle
+from app.models import Article, PhotoArticle, PhotoVariante
 from app.services import images, photos, replicate_client, storage
 
 router = APIRouter(tags=["photos"])
@@ -143,8 +144,11 @@ def modifier(photo_id: int, data: ModifPhoto, db: Db) -> PhotoOut:
 @router.delete("/photos/{photo_id}", status_code=204)
 def supprimer(photo_id: int, db: Db) -> None:
     p = _photo(db, photo_id)
+    for v in _variantes(db, [p.id]):
+        if v.fichier:
+            storage.supprimer(v.fichier)
     for chemin in (p.fichier_original, p.fichier_genere):
-        if chemin:
+        if chemin and storage.chemin_absolu(chemin).exists():
             storage.supprimer(chemin)
     db.delete(p)
     db.commit()
@@ -308,3 +312,136 @@ def fond(db: Db) -> FileResponse:
     if not p.photo_fond or not storage.chemin_absolu(p.photo_fond).exists():
         raise HTTPException(404, "Aucune photo de fond.")
     return FileResponse(storage.chemin_absolu(p.photo_fond), media_type="image/jpeg")
+
+
+# --- Comparaison de modèles -------------------------------------------------------------------
+
+
+class VarianteOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    photo_id: int
+    modele: str
+    statut: str
+    cout_estime: Decimal
+    duree_secondes: float | None
+    erreur: str | None
+    created_at: datetime
+
+
+class ComparerIn(BaseModel):
+    modeles: list[str] | None = None
+    types: list[TypePhoto] | None = None
+
+
+def _variantes(db: Db, photo_ids: list[int]) -> list[PhotoVariante]:
+    if not photo_ids:
+        return []
+    return list(
+        db.scalars(
+            select(PhotoVariante).where(PhotoVariante.photo_id.in_(photo_ids)).order_by(PhotoVariante.id)
+        )
+    )
+
+
+def _supprimer_variantes(db: Db, variantes: list[PhotoVariante]) -> None:
+    utilises = {p.fichier_genere for p in db.scalars(select(PhotoArticle)) if p.fichier_genere}
+    for v in variantes:
+        if v.fichier and v.fichier not in utilises:
+            storage.supprimer(v.fichier)
+        db.delete(v)
+
+
+@router.post("/articles/{article_id}/photos/comparer", response_model=list[VarianteOut])
+def comparer(article_id: int, data: ComparerIn, db: Db, taches: BackgroundTasks) -> list[PhotoVariante]:
+    """Génère chaque photo avec plusieurs modèles, avec la même disposition, pour les comparer."""
+    _article(db, article_id)
+    _verifier_config(db)
+    modeles = data.modeles or photos.MODELES_COMPARAISON
+    if any(m not in replicate_client.PRIX_PAR_IMAGE for m in modeles):
+        raise HTTPException(422, "Modèle non pris en charge.")
+    cibles = [
+        p
+        for p in _photos_article(db, article_id)
+        if p.type != "defaut" and (not data.types or p.type in data.types)
+    ]
+    if not cibles:
+        raise HTTPException(409, "Dépose d'abord des photos (devant, dos, étiquette, logo).")
+    anciennes = _variantes(db, [p.id for p in cibles])
+    if any(v.statut == "en_cours" for v in anciennes):
+        raise HTTPException(409, "Une comparaison est déjà en cours pour cet article.")
+    _supprimer_variantes(db, anciennes)
+    lumiere = random.choice(photos.LUMIERES)
+    nouvelles = []
+    for p in cibles:
+        dispo = photos.disposition(p.type, random.Random(), lumiere)  # identique pour tous les modèles
+        for m in modeles:
+            v = PhotoVariante(photo_id=p.id, modele=m, disposition=dispo, statut="en_cours")
+            db.add(v)
+            nouvelles.append(v)
+    db.commit()
+    taches.add_task(photos.tache_comparaison, [v.id for v in nouvelles])
+    return nouvelles
+
+
+@router.get("/articles/{article_id}/photos/comparaison")
+def comparaison(article_id: int, db: Db) -> dict[str, object]:
+    _article(db, article_id)
+    liste = [p for p in _photos_article(db, article_id) if p.type != "defaut"]
+    variantes = _variantes(db, [p.id for p in liste])
+    par_photo: dict[int, list[PhotoVariante]] = {}
+    for v in variantes:
+        par_photo.setdefault(v.photo_id, []).append(v)
+    modeles = list(dict.fromkeys(v.modele for v in variantes))
+    return {
+        "modeles": modeles,
+        "prix": {m: replicate_client.PRIX_PAR_IMAGE.get(m) for m in modeles or photos.MODELES_COMPARAISON},
+        "en_cours": any(v.statut == "en_cours" for v in variantes),
+        "cout_total": sum((v.cout_estime for v in variantes), Decimal("0")),
+        "lignes": [
+            {"photo": _out(p), "variantes": [VarianteOut.model_validate(v) for v in par_photo.get(p.id, [])]}
+            for p in liste
+            if p.id in par_photo
+        ],
+    }
+
+
+@router.get("/variantes/{variante_id}/fichier")
+def fichier_variante(variante_id: int, db: Db) -> FileResponse:
+    v = db.get(PhotoVariante, variante_id)
+    if v is None or not v.fichier or not storage.chemin_absolu(v.fichier).exists():
+        raise HTTPException(404, "Variante introuvable.")
+    return FileResponse(
+        storage.chemin_absolu(v.fichier),
+        media_type="image/jpeg",
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
+
+
+class ChoisirIn(BaseModel):
+    defaut_pour_type: bool = False
+
+
+@router.post("/variantes/{variante_id}/choisir", response_model=PhotoOut)
+def choisir_variante(variante_id: int, data: ChoisirIn, db: Db) -> PhotoOut:
+    """Utilise cette variante comme photo retouchée ; peut aussi en faire le modèle par défaut du type."""
+    v = db.get(PhotoVariante, variante_id)
+    if v is None or v.statut != "genere" or not v.fichier:
+        raise HTTPException(409, "Cette variante n'est pas disponible.")
+    p = _photo(db, v.photo_id)
+    ancien = p.fichier_genere
+    p.fichier_genere, p.modele = v.fichier, v.modele
+    p.statut, p.version_choisie, p.erreur = "genere", "genere", None
+    p.disposition = v.disposition
+    if (
+        ancien
+        and ancien != v.fichier
+        and not db.scalar(select(PhotoVariante.id).where(PhotoVariante.fichier == ancien))
+    ):
+        storage.supprimer(ancien)
+    if data.defaut_pour_type and p.type in photos.TYPES_RETOUCHES:
+        params = get_parametres(db)
+        params.modeles_photos = {**(params.modeles_photos or {}), p.type: v.modele}
+    db.commit()
+    return _out(p)
