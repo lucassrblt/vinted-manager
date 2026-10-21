@@ -1,7 +1,18 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, Clock, PackageOpen, Target, Truck } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowDownRight,
+  ArrowUpRight,
+  Clock,
+  Inbox,
+  PackageCheck,
+  PackageOpen,
+  Receipt,
+  Target,
+  Truck,
+} from "lucide-react";
 import Link from "next/link";
 
 import { CarteKpi, GrilleSquelette, MessageErreur } from "@/components/commun";
@@ -78,6 +89,37 @@ export default function EcranDuJourPage() {
               }
               className="mt-3 h-2 [&>div]:bg-brand"
               aria-label="Progression de l'objectif du jour"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+            <CarteKpi
+              libelle="Colis à envoyer"
+              valeur={d.envois.a_preparer}
+              icone={PackageCheck}
+              href="/envois"
+              ton={d.envois.en_retard ? "alerte" : d.envois.aujourdhui ? "brand" : undefined}
+              detail={
+                d.envois.en_retard
+                  ? `${d.envois.en_retard} en retard · ${d.envois.aujourdhui} aujourd'hui`
+                  : d.envois.aujourdhui
+                    ? `${d.envois.aujourdhui} à déposer aujourd'hui`
+                    : "rien d'urgent"
+              }
+            />
+            <CarteKpi
+              libelle="Ventes à confirmer"
+              valeur={d.ventes_a_confirmer}
+              icone={Receipt}
+              href="/ventes"
+              detail={d.ventes_a_confirmer ? "un clic pour choisir l'article" : "tout est rapproché"}
+            />
+            <CarteKpi
+              libelle="Mails non classés"
+              valeur={d.mails_non_classes}
+              icone={Inbox}
+              href="/mails"
+              detail={d.mails_non_classes ? "à classer ou à transformer en règle" : "tout est reconnu"}
             />
           </div>
 

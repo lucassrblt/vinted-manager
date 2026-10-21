@@ -2,10 +2,12 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { EnTetePage, LignesSquelette } from "@/components/commun";
+import { ConfigurationImap } from "@/components/mails/config-imap";
 import { Champ } from "@/components/stock/dialog-article";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,6 +64,15 @@ function versSaisie(p: Parametres, cle: keyof Parametres, type: string): string 
 }
 
 export default function PageParametres() {
+  return (
+    <Suspense fallback={<LignesSquelette n={6} />}>
+      <ContenuParametres />
+    </Suspense>
+  );
+}
+
+function ContenuParametres() {
+  const ongletInitial = useSearchParams().get("onglet") ?? "general";
   const qc = useQueryClient();
   const { data } = useParametres();
   const [valeurs, setValeurs] = useState<Record<string, string>>({});
@@ -104,12 +115,10 @@ export default function PageParametres() {
   return (
     <>
       <EnTetePage titre="Paramètres" />
-      <Tabs defaultValue="general">
+      <Tabs defaultValue={ongletInitial}>
         <TabsList>
           <TabsTrigger value="general">Général</TabsTrigger>
-          <TabsTrigger value="mails" disabled>
-            Mails (étape 2)
-          </TabsTrigger>
+          <TabsTrigger value="mails">Mails</TabsTrigger>
           <TabsTrigger value="notifications" disabled>
             Notifications (étape 4)
           </TabsTrigger>
@@ -155,6 +164,9 @@ export default function PageParametres() {
               </div>
             </form>
           )}
+        </TabsContent>
+        <TabsContent value="mails" className="mt-5">
+          <ConfigurationImap />
         </TabsContent>
       </Tabs>
     </>

@@ -1,17 +1,34 @@
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
-from app.api import articles, auth, batches, compta, import_export, preuves, sourcing, systeme
+from app import scheduler
+from app.api import articles, auth, batches, compta, import_export, mails, preuves, sourcing, systeme, ventes
 from app.api.deps import session_requise
 from app.config import get_settings
 from app.db import SessionLocal
 from app.logging import configurer_logs, log
+from app.seed.regles import installer_regles
 
 configurer_logs(get_settings().log_level)
 
-app = FastAPI(title="Vinted Manager", docs_url="/api/docs", openapi_url="/api/openapi.json")
+
+@asynccontextmanager
+async def cycle_de_vie(_: FastAPI) -> AsyncIterator[None]:
+    with SessionLocal() as db:
+        installer_regles(db)
+    scheduler.demarrer()
+    yield
+    scheduler.arreter()
+
+
+app = FastAPI(
+    title="Vinted Manager", docs_url="/api/docs", openapi_url="/api/openapi.json", lifespan=cycle_de_vie
+)
 
 
 @app.exception_handler(RequestValidationError)
@@ -44,7 +61,7 @@ publique = APIRouter(prefix="/api")
 publique.include_router(auth.router)
 
 protegee = APIRouter(prefix="/api", dependencies=[Depends(session_requise)])
-for module in (articles, batches, preuves, import_export, compta, sourcing, systeme):
+for module in (articles, batches, preuves, import_export, compta, sourcing, systeme, mails, ventes):
     protegee.include_router(module.router)
 
 app.include_router(publique)

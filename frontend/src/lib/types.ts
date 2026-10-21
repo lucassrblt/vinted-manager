@@ -245,4 +245,130 @@ export interface EcranDuJour {
     nb_ventes_precedente: number;
   };
   objectif_jour: { objectif: number; ventes: number };
+  envois: { a_preparer: number; en_retard: number; aujourdhui: number };
+  ventes_a_confirmer: number;
+  mails_non_classes: number;
+}
+
+// --- Étape 2 : mails, ventes, envois -------------------------------------------------------
+
+export type TypeEmail =
+  | "vente"
+  | "bordereau"
+  | "message"
+  | "offre"
+  | "expedie"
+  | "livre"
+  | "argent_disponible"
+  | "evaluation"
+  | "litige"
+  | "autre";
+
+export type StatutTraitement = "nouveau" | "traite" | "ignore" | "a_classer";
+export type StatutEnvoi = "a_imprimer" | "imprime" | "depose" | "livre";
+
+export interface DonneesExtraites {
+  prix?: string;
+  montant_offre?: string;
+  titre_article?: string;
+  numero_commande?: string;
+  acheteur?: string;
+  date_limite?: string;
+  lien_bordereau?: string;
+}
+
+export interface EmailResume {
+  id: number;
+  date: string | null;
+  expediteur: string | null;
+  sujet: string | null;
+  type_detecte: TypeEmail | null;
+  statut_traitement: StatutTraitement;
+  regle_nom: string | null;
+  donnees_extraites: DonneesExtraites;
+  article_id: number | null;
+  article_nom: string | null;
+  vente_id: number | null;
+  extrait: string;
+}
+
+export interface EmailDetail extends EmailResume {
+  corps_texte: string | null;
+  corps_html: string | null;
+  pieces_jointes: { id: number; nom: string; mime: string }[];
+}
+
+export interface Candidat {
+  article_id: number;
+  nom: string;
+  taille: string | null;
+  prix_vente: Decimal | null;
+  score: number;
+}
+
+export interface VenteAConfirmer {
+  email_id: number;
+  date: string | null;
+  sujet: string | null;
+  donnees: DonneesExtraites;
+  candidats: Candidat[];
+}
+
+export interface VenteListe {
+  id: number;
+  prix: Decimal;
+  date_heure: string;
+  acheteur: string | null;
+  numero_commande: string | null;
+  auto_rapproche: boolean;
+  article: { id: number; nom: string; taille: string | null; statut: Statut };
+}
+
+export interface EnvoiListe {
+  id: number;
+  statut: StatutEnvoi;
+  transporteur: string | null;
+  date_limite_envoi: string | null;
+  date_depot: string | null;
+  a_bordereau_pdf: boolean;
+  lien_bordereau: string | null;
+  vente: { id: number; prix: Decimal; acheteur: string | null; numero_commande: string | null; date_heure: string };
+  article: { id: number; nom: string; taille: string | null; statut: Statut };
+}
+
+export interface Regle {
+  id: number;
+  nom: string;
+  type_cible: TypeEmail;
+  conditions: {
+    expediteurs?: string[];
+    sujet_contient?: string[];
+    corps_contient?: string[];
+    sujet_regex?: string;
+    corps_regex?: string;
+    piece_jointe_pdf?: boolean;
+  };
+  extraction: Partial<Record<keyof DonneesExtraites, string>>;
+  priorite: number;
+  active: boolean;
+  created_at: string;
+}
+
+export interface ConfigImap {
+  serveur: string | null;
+  port: number | null;
+  email: string | null;
+  dossier: string;
+  mot_de_passe_defini: boolean;
+  expediteurs: string[];
+  derniere_synchro: string | null;
+  presets: Record<string, { serveur: string; port: number }>;
+}
+
+export interface SyncLog {
+  id: number;
+  debut: string;
+  fin: string | null;
+  nb_mails: number;
+  erreur: string | null;
 }

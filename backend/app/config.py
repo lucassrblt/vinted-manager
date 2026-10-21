@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     max_upload_mb: int = 15
     timezone: str = "Europe/Paris"
     log_level: str = "INFO"
+    # Tâches planifiées (synchro des mails toutes les 5 min). Désactivées dans les tests.
+    scheduler_actif: bool = True
+    intervalle_synchro_minutes: int = 5
 
     @field_validator("database_url")
     @classmethod

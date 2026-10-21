@@ -74,3 +74,12 @@ def supprimer(relatif: str) -> None:
     chemin = chemin_absolu(relatif)
     if chemin.exists():
         chemin.unlink()
+
+
+def ecrire_fichier(dossier: str, nom: str, contenu: bytes) -> str:
+    """Écrit un fichier généré par l'app (pièce jointe de mail…) et renvoie son chemin relatif."""
+    relatif = f"{dossier}/{secrets.token_hex(6)}_{nom_sur(nom)}"
+    cible = chemin_absolu(relatif)
+    cible.parent.mkdir(parents=True, exist_ok=True)
+    cible.write_bytes(contenu)
+    return relatif

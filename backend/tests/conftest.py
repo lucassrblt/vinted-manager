@@ -9,6 +9,8 @@ os.environ["DATABASE_URL"] = os.environ.get(
     "TEST_DATABASE_URL", "postgresql+psycopg://vm:vm@localhost:54329/vm_test"
 )
 os.environ["COOKIE_SECURE"] = "false"
+os.environ["SCHEDULER_ACTIF"] = "false"
+os.environ.setdefault("FERNET_KEY", "x8J6c9n8Wq2N3bJ5cT0E7jQ4oX1hY2bV6aZ9kL3mP0s=")
 
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402
@@ -70,3 +72,10 @@ def excel_reel() -> bytes:
     if not EXCEL_REEL.exists():
         pytest.skip(f"Excel réel absent ({EXCEL_REEL}) : copie-le dans tests/data/suivi-revente.xlsx")
     return EXCEL_REEL.read_bytes()
+
+
+@pytest.fixture
+def regles(db: Session) -> None:
+    from app.seed.regles import installer_regles
+
+    installer_regles(db)

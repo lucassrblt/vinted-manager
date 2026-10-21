@@ -82,3 +82,21 @@ export function saisieVersDecimal(v: string): string | null {
   if (propre === "") return null;
   return Number.isFinite(Number(propre)) ? propre : null;
 }
+
+/** Jour (AAAA-MM-JJ) à Paris d'une date-heure ISO. */
+export function jourParis(iso: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(new Date(iso));
+}
+
+/** Échéance relative à aujourd'hui (heure de Paris) : retard, aujourd'hui, demain ou plus tard. */
+export function echeance(iso: string | null | undefined): "retard" | "aujourdhui" | "demain" | "plus_tard" | null {
+  if (!iso) return null;
+  const jour = jourParis(iso);
+  const auj = aujourdhuiParis();
+  const demain = new Date(`${auj}T12:00:00Z`);
+  demain.setUTCDate(demain.getUTCDate() + 1);
+  if (jour < auj) return "retard";
+  if (jour === auj) return "aujourdhui";
+  if (jour === demain.toISOString().slice(0, 10)) return "demain";
+  return "plus_tard";
+}

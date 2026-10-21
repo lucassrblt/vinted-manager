@@ -72,7 +72,7 @@ npm run e2e   # app lancée, base vide, utilisateur demo@example.com / demo-motd
    | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` (référence Railway ; le préfixe est converti automatiquement) |
    | `DATA_DIR` | `/data` |
    | `COOKIE_SECURE` | `true` |
-   | `FERNET_KEY` | voir plus bas (nécessaire à l'étape 2) |
+   | `FERNET_KEY` | voir plus bas (obligatoire pour configurer la boîte mail) |
    | `LOG_LEVEL` | `INFO` |
    | `ANTHROPIC_API_KEY` | étape 3 |
    | `ANTHROPIC_MODEL` | `claude-haiku-5-5` (étape 3, optionnel) |
@@ -104,15 +104,27 @@ npx web-push generate-vapid-keys
 
 Garde ces clés en lieu sûr : sans la même `FERNET_KEY`, les identifiants IMAP enregistrés ne peuvent plus être déchiffrés.
 
-### Mot de passe d'application Gmail (étape 2)
+### Mot de passe d'application Gmail
 
 Gmail refuse ton mot de passe habituel en IMAP :
 1. Active la validation en deux étapes : https://myaccount.google.com/security
 2. Va sur https://myaccount.google.com/apppasswords, crée un mot de passe nommé « Revente » et copie les 16 caractères.
 3. Dans l'app : **Paramètres → Mails**, serveur `imap.gmail.com`, port `993`, ton adresse et ce mot de passe d'application.
 
-### Améliorer la reconnaissance des mails Vinted (étape 2)
+### Améliorer la reconnaissance des mails Vinted
 
 Dépose de vrais mails Vinted au format `.eml` (dans Gmail : ⋮ → **Télécharger le message**) dans `backend/fixtures/emails/<type>/` :
 `vente`, `bordereau`, `message`, `offre`, `expedie`, `livre`, `argent_disponible`, `evaluation`, `litige`, `autre`.
 Les tests vérifient automatiquement le classement et l'extraction sur chacun de ces fichiers. Ils ne sont pas versionnés (données personnelles).
+
+Pour vérifier aussi les valeurs extraites, ajoute à côté un `.json` du même nom :
+
+```json
+{ "prix": "45.00", "titre_article": "Pull demi-zip polaire Ralph Lauren - Noir", "numero_commande": "8812345678" }
+```
+
+```bash
+cd backend && uv run pytest tests/test_classifieur.py -v
+```
+
+Les règles s'ajustent ensuite dans l'app (**Règles des mails**) ou dans `backend/app/seed/regles.py` pour les règles par défaut.

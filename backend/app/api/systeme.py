@@ -5,12 +5,12 @@ from decimal import Decimal
 
 from fastapi import APIRouter
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import or_, select
+from sqlalchemy import func, or_, select
 
 from app.api.deps import Db, get_parametres
 from app.db import utcnow
-from app.models import Article, Batch
-from app.models.enums import StatutArticle
+from app.models import Article, Batch, EmailVinted, Envoi
+from app.models.enums import StatutArticle, StatutEnvoi, StatutTraitementEmail, TypeEmail
 from app.services import stats
 
 router = APIRouter(tags=["systeme"])
@@ -123,7 +123,29 @@ def ecran_du_jour(db: Db) -> dict[str, object]:
             nb_ventes_precedente=precedente.nb_ventes,
         ),
         "objectif_jour": {"objectif": params.objectif_ventes_jour, "ventes": ventes_jour},
+        "envois": _compteurs_envois(db, aujourdhui),
+        "ventes_a_confirmer": _compter_mails(db, TypeEmail.VENTE, StatutTraitementEmail.NOUVEAU),
+        "mails_non_classes": _compter_mails(db, None, StatutTraitementEmail.A_CLASSER),
     }
+
+
+def _compteurs_envois(db: Db, aujourdhui: date) -> dict[str, int]:
+    limites = db.scalars(
+        select(Envoi.date_limite_envoi).where(Envoi.statut.in_([StatutEnvoi.A_IMPRIMER, StatutEnvoi.IMPRIME]))
+    ).all()
+    jours = [stats.jour_local(d) for d in limites if d is not None]
+    return {
+        "a_preparer": len(limites),
+        "en_retard": sum(1 for j in jours if j < aujourdhui),
+        "aujourdhui": sum(1 for j in jours if j == aujourdhui),
+    }
+
+
+def _compter_mails(db: Db, type_email: TypeEmail | None, statut: StatutTraitementEmail) -> int:
+    q = select(func.count(EmailVinted.id)).where(EmailVinted.statut_traitement == statut)
+    if type_email:
+        q = q.where(EmailVinted.type_detecte == type_email)
+    return db.scalar(q) or 0
 
 
 @router.get("/alertes")

@@ -1,4 +1,4 @@
-import type { Etat, Statut } from "@/lib/types";
+import type { Etat, Statut, StatutEnvoi, TypeEmail } from "@/lib/types";
 
 // Une seule définition des libellés et couleurs de statut, utilisée dans toute l'app.
 export const STATUTS: Record<Statut, { libelle: string; classe: string; point: string }> = {
@@ -76,3 +76,25 @@ export const TYPES_PREUVE: Record<string, string> = {
   certificat: "Certificat",
   autre: "Autre",
 };
+
+export const TYPES_EMAIL: Record<TypeEmail, string> = {
+  vente: "Vente",
+  bordereau: "Bordereau",
+  message: "Message reçu",
+  offre: "Offre reçue",
+  expedie: "Colis expédié",
+  livre: "Colis livré",
+  argent_disponible: "Argent disponible",
+  evaluation: "Évaluation reçue",
+  litige: "Litige",
+  autre: "Autre",
+};
+
+export const STATUTS_ENVOI: Record<StatutEnvoi, { libelle: string; classe: string }> = {
+  a_imprimer: { libelle: "À imprimer", classe: "bg-amber-50 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300" },
+  imprime: { libelle: "Imprimé", classe: "bg-sky-50 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300" },
+  depose: { libelle: "Déposé", classe: "bg-violet-50 text-violet-800 dark:bg-violet-950/60 dark:text-violet-300" },
+  livre: { libelle: "Livré", classe: "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300" },
+};
+
+export const ORDRE_ENVOI: StatutEnvoi[] = ["a_imprimer", "imprime", "depose", "livre"];
