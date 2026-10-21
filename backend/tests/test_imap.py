@@ -205,6 +205,16 @@ def test_vente_attribue_le_compte_a_l_article(db: Session, regles: None) -> None
     assert pull.statut == "vendu" and pull.compte_id == compte.id
 
 
+def test_premiere_synchro_remonte_au_premier_achat(db: Session) -> None:
+    from datetime import date
+
+    assert imap_sync.debut_historique(db) < utcnow() - timedelta(days=29)
+    db.add(Article(nom="Ancien", date_achat=date(2026, 3, 1)))
+    db.commit()
+    debut = imap_sync.debut_historique(db)
+    assert debut.date() == date(2026, 2, 14)  # premier achat moins 15 jours
+
+
 def test_critere_expediteurs() -> None:
     assert imap_sync.critere_expediteurs(["a"]) == 'FROM "a"'
     assert imap_sync.critere_expediteurs(["a", "b", "c"]) == 'OR FROM "a" OR FROM "b" FROM "c"'

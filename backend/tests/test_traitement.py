@@ -169,3 +169,69 @@ def test_message_sur_article_en_double(db: Session, regles: None) -> None:
     _recevoir(db, ms.MESSAGE)
     message = db.scalar(select(Message))
     assert message is not None and message.article_id == en_ligne[0].id
+
+
+def _vendu_importe(db: Session, nom: str, prix_reel: str = "45") -> Article:
+    """Article vendu venu de l'Excel : date de vente estimée, aucune vente enregistrée."""
+    from datetime import UTC, datetime
+
+    from app.services.statuts import changer_statut
+
+    a = Article(nom=nom, prix_achat_net=D("16.67"), prix_vente_reel=D(prix_reel), statut="commande")
+    db.add(a)
+    changer_statut(
+        db, a, "vendu", quand=datetime(2026, 10, 5, 12, tzinfo=UTC), commentaire="Import Excel (date estimée)"
+    )
+    db.commit()
+    return a
+
+
+def test_historique_corrige_la_date_d_une_vente_importee(
+    client: TestClient, db: Session, regles: None
+) -> None:
+    pull = _vendu_importe(db, "Pull demi-zip polaire Ralph Lauren - Noir")
+    autre = _article(db, "Bonnet Ralph Lauren - Blanc", "16")
+    email = _recevoir(db, ms.VENTE)
+    db.refresh(pull)
+    db.refresh(autre)
+    assert email.statut_traitement == "traite" and email.article_id == pull.id
+    assert pull.statut == "vendu" and pull.date_vente == ms.DATE and autre.statut == "en_ligne"
+    vente = db.scalar(select(Vente))
+    assert vente is not None and vente.acheteur == "claire_75" and vente.prix == D("45.00")
+    passage = db.scalar(select(HistoriqueStatut).where(HistoriqueStatut.nouveau_statut == "vendu"))
+    assert passage is not None and passage.date == ms.DATE and "corrigée" in (passage.commentaire or "")
+    # Annuler : l'article reste vendu avec sa date estimée d'origine
+    assert client.post(f"/api/ventes/{vente.id}/annuler").status_code == 204
+    db.expire_all()
+    pull = db.get(Article, pull.id)
+    assert pull is not None and pull.statut == "vendu" and pull.date_vente is not None
+    assert pull.date_vente.day == 5
+    a_confirmer = client.get("/api/ventes/a-confirmer").json()
+    assert a_confirmer[0]["candidats"][0]["deja_vendu"] is True
+    # Confirmation à la main sur l'article importé : acceptée
+    r = client.post("/api/ventes/confirmer", json={"email_id": email.id, "article_id": pull.id})
+    assert r.status_code == 200, r.text
+    # Il a maintenant une vente : un autre mail ne peut plus lui être rattaché
+    assert (
+        client.post("/api/ventes/confirmer", json={"email_id": email.id, "article_id": pull.id}).status_code
+        == 409
+    )
+
+
+def test_vente_importee_n_est_pas_volee_par_un_article_en_ligne(db: Session, regles: None) -> None:
+    """Le même modèle vendu (import) et un exemplaire encore en ligne : à confirmer, jamais au hasard."""
+    _vendu_importe(db, "Pull demi-zip polaire Ralph Lauren - Noir")
+    en_ligne = _article(db, "Pull demi-zip polaire Ralph Lauren - Noir")
+    email = _recevoir(db, ms.VENTE)
+    db.refresh(en_ligne)
+    assert email.statut_traitement == "nouveau" and en_ligne.statut == "en_ligne"
+
+
+def test_article_achete_apres_la_vente_exclu(db: Session, regles: None) -> None:
+    from datetime import date
+
+    pull = _article(db, "Pull demi-zip polaire Ralph Lauren - Noir")
+    pull.date_achat = date(2026, 10, 25)  # après le mail (20/10)
+    db.commit()
+    email = _recevoir(db, ms.VENTE)
+    assert email.statut_traitement == "nouveau" and db.scalar(select(Vente)) is None

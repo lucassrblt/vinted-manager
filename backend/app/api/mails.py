@@ -161,6 +161,16 @@ def modifier_compte(compte_id: int, data: CompteIn, db: Db) -> CompteOut:
     return _compte_out(db, compte)
 
 
+@router.post("/comptes/{compte_id}/relire", response_model=CompteOut)
+def relire_historique(compte_id: int, db: Db) -> CompteOut:
+    """La prochaine synchro relit toute la boîte depuis le début de l'activité (les mails déjà
+    importés sont reconnus par leur Message-ID et ignorés)."""
+    compte = _get_compte(db, compte_id)
+    compte.derniere_synchro = None
+    db.commit()
+    return _compte_out(db, compte)
+
+
 @router.delete("/comptes/{compte_id}", status_code=204)
 def supprimer_compte(compte_id: int, db: Db) -> None:
     """Débranche la boîte. Les mails, ventes et articles déjà importés sont conservés."""

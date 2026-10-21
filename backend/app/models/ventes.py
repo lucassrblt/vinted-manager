@@ -71,6 +71,8 @@ class Vente(TimestampMixin, Base):
     frais: Mapped[Decimal | None] = mapped_column(Money)
     email_id: Mapped[int | None] = mapped_column(ForeignKey("email_vinted.id", ondelete="SET NULL"))
     auto_rapproche: Mapped[bool] = mapped_column(default=False)
+    # Vente complétée sur un article déjà vendu à l'import : date estimée remplacée (restaurée si annulation)
+    date_estimee_import: Mapped[datetime | None]
 
 
 class Envoi(TimestampMixin, Base):

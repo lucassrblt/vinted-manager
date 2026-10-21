@@ -11,21 +11,22 @@ import ssl
 import threading
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db import utcnow
 from app.logging import log
-from app.models import CompteVinted, Parametres, SyncLog
+from app.models import Article, CompteVinted, Parametres, SyncLog
 from app.services import crypto
 from app.services.email_parser import lire_mail
 from app.services.notifications import annuler_en_attente
 from app.services.traitement import enregistrer_mail
 
-PREMIERE_SYNCHRO_JOURS = 30
+PREMIERE_SYNCHRO_JOURS = 30  # au minimum ; on remonte jusqu'au premier achat du stock
+MARGE_HISTORIQUE_JOURS = 15
 TIMEOUT_SECONDES = 30
 MOIS_IMAP = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
@@ -66,6 +67,16 @@ def comptes_actifs(db: Session) -> list[CompteVinted]:
 
 def noms_comptes(db: Session) -> dict[int, str]:
     return {c.id: c.nom for c in db.scalars(select(CompteVinted))}
+
+
+def debut_historique(db: Session) -> datetime:
+    """Première synchro d'une boîte : tous les mails depuis le début de l'activité (premier achat)."""
+    minimum = utcnow() - timedelta(days=PREMIERE_SYNCHRO_JOURS)
+    premier_achat = db.scalar(select(func.min(Article.date_achat)))
+    if premier_achat is None:
+        return minimum
+    debut = datetime.combine(premier_achat, time(), tzinfo=UTC) - timedelta(days=MARGE_HISTORIQUE_JOURS)
+    return min(debut, minimum)
 
 
 def config_depuis(compte: CompteVinted) -> ConfigImap:
@@ -189,9 +200,7 @@ def _synchroniser_compte(
     try:
         cfg = config_depuis(compte)
         depuis = (
-            (compte.derniere_synchro - timedelta(days=1))
-            if compte.derniere_synchro
-            else (utcnow() - timedelta(days=PREMIERE_SYNCHRO_JOURS))
+            (compte.derniere_synchro - timedelta(days=1)) if compte.derniere_synchro else debut_historique(db)
         )
         client = _ouvrir(cfg, fabrique)
         erreurs: list[str] = []

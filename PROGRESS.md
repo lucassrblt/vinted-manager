@@ -189,7 +189,13 @@ Coût estimé : **~0,05 $ par article** (4 photos), soit ~5 $ pour 100 articles,
 - **Articles** : champ « Compte Vinted » (fiche, création, action groupée, filtre du stock).
 - **Rapprochement** : une vente reçue sur un compte n'est rapprochée qu'avec les articles de ce compte ou ceux pas encore attribués. Une vente confirmée attribue le compte à l'article.
 
+- **Relecture de l'historique** : la première synchro d'une boîte remonte jusqu'au premier achat du stock (moins 15 jours, 30 jours au minimum). Bouton « Relire tout l'historique » par boîte.
+- **Ventes importées de l'Excel** (vendues, date estimée, sans vente enregistrée) : un mail de vente qui leur correspond remplace la date estimée par la vraie date et heure, et enregistre prix, acheteur et n° de commande. L'article reste vendu ; les mails d'expédition et de livraison qui suivent mettent l'envoi à jour. Annuler restaure la date estimée.
+- Pas de notification push pour les mails de plus de 2 jours (relecture de l'historique).
+- Un article acheté après la date du mail de vente est écarté du rapprochement.
+
 ### Décisions prises
+- Un article vendu importé et un exemplaire identique encore en ligne : la vente part dans « à confirmer » plutôt que d'être attribuée au hasard.
 - Le filtre et les badges n'apparaissent qu'à partir de 2 comptes, pour ne pas charger l'écran avec un seul compte.
 - Débrancher une boîte conserve ses mails, ventes et articles (le lien vers le compte est retiré).
 - Les expéditeurs Vinted lus restent communs à toutes les boîtes.

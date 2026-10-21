@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Loader2, Mail, Pencil, PlugZap, Plus, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, History, Loader2, Mail, Pencil, PlugZap, Plus, Trash2, XCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -59,6 +59,14 @@ export function ConfigurationImap() {
         },
       }),
     onSuccess: rafraichir,
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const relire = useMutation({
+    mutationFn: (c: CompteVinted) => api(`/comptes/${c.id}/relire`, { method: "POST" }),
+    onSuccess: () => {
+      rafraichir();
+      toast.success("Toute la boîte sera relue à la prochaine synchro");
+    },
     onError: (e: Error) => toast.error(e.message),
   });
   const supprimer = useMutation({
@@ -137,6 +145,16 @@ export function ConfigurationImap() {
                     onCheckedChange={() => basculer.mutate(c)}
                     aria-label={c.actif ? `Mettre ${c.nom} en pause` : `Réactiver ${c.nom}`}
                   />
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    onClick={() => relire.mutate(c)}
+                    disabled={relire.isPending}
+                    aria-label={`Relire tout l'historique de ${c.nom}`}
+                    title="Relire tout l'historique de la boîte"
+                  >
+                    <History />
+                  </Button>
                   <Button size="icon-sm" variant="ghost" onClick={() => setEdition(c)} aria-label={`Modifier ${c.nom}`}>
                     <Pencil />
                   </Button>

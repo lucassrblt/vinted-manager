@@ -313,6 +313,7 @@ export interface Candidat {
   taille: string | null;
   prix_vente: Decimal | null;
   score: number;
+  deja_vendu: boolean;
 }
 
 export interface VenteAConfirmer {

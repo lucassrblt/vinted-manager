@@ -37,7 +37,9 @@ def ventes_a_confirmer(db: Db) -> list[dict[str, Any]]:
     for e in emails:
         d = e.donnees_extraites or {}
         prix = Decimal(d["prix"]) if d.get("prix") else None
-        candidats = rapprochement.candidats(db, d.get("titre_article"), prix, compte_id=e.compte_id)
+        candidats = rapprochement.candidats(
+            db, d.get("titre_article"), prix, compte_id=e.compte_id, date_mail=e.date
+        )
         resultat.append(
             {
                 "email_id": e.id,
@@ -64,7 +66,13 @@ def confirmer(data: ConfirmerIn, db: Db) -> dict[str, Any]:
         raise HTTPException(404, "Mail ou article introuvable.")
     if email.type_detecte != TypeEmail.VENTE or email.vente_id:
         raise HTTPException(409, "Cette vente est déjà confirmée.")
-    if article.statut not in (StatutArticle.EN_LIGNE, StatutArticle.RECU_A_PUBLIER):
+    importe_sans_vente = article.statut in rapprochement.STATUTS_A_COMPLETER and not db.scalar(
+        select(Vente.id).where(Vente.article_id == article.id)
+    )
+    if (
+        article.statut not in (StatutArticle.EN_LIGNE, StatutArticle.RECU_A_PUBLIER)
+        and not importe_sans_vente
+    ):
         raise HTTPException(409, f"Cet article n'est pas en vente (statut : {article.statut}).")
     vente = traitement.confirmer_vente(db, email, article, auto=False)
     db.commit()

@@ -7,7 +7,7 @@ Statut de traitement d'un mail :
 - `ignore` : écarté à la main
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -16,7 +16,17 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import utcnow
-from app.models import Article, EmailVinted, Envoi, Message, PieceJointe, RegleClassement, Vente
+from app.logging import log
+from app.models import (
+    Article,
+    EmailVinted,
+    Envoi,
+    HistoriqueStatut,
+    Message,
+    PieceJointe,
+    RegleClassement,
+    Vente,
+)
 from app.models.enums import (
     StatutArticle,
     StatutEnvoi,
@@ -27,11 +37,12 @@ from app.models.enums import (
 from app.services import classifieur, rapprochement, storage
 from app.services.email_parser import MailLu, PieceJointeBrute, liens_html, re_liens
 from app.services.marques import normaliser
-from app.services.notifications import envoyer_en_attente, notifier
+from app.services.notifications import annuler_en_attente, envoyer_en_attente, notifier
 from app.services.statuts import changer_statut
 
 DELAI_ENVOI_JOURS_OUVRES = 5  # délai Vinted pour expédier après une vente
 SEUIL_TITRE = 75.0
+AGE_MAX_NOTIFICATION_JOURS = 2
 
 # Statut d'article associé à chaque statut d'envoi.
 ARTICLE_PAR_ENVOI = {StatutEnvoi.DEPOSE: StatutArticle.ENVOYE, StatutEnvoi.LIVRE: StatutArticle.LIVRE}
@@ -78,7 +89,10 @@ def enregistrer_mail(db: Session, mail: MailLu, compte_id: int | None = None) ->
     if resultat.type:
         appliquer(db, email)
     db.commit()
-    envoyer_en_attente(db)
+    if email.date and email.date < utcnow() - timedelta(days=AGE_MAX_NOTIFICATION_JOURS):
+        annuler_en_attente(db)  # relecture de l'historique : pas de notification pour les vieux mails
+    else:
+        envoyer_en_attente(db)
     return email
 
 
@@ -107,12 +121,16 @@ def _vente(db: Session, email: EmailVinted, article: Article | None) -> None:
     d = email.donnees_extraites or {}
     if article is None:
         liste = rapprochement.candidats(
-            db, d.get("titre_article"), _decimal(d.get("prix")), compte_id=email.compte_id
+            db,
+            d.get("titre_article"),
+            _decimal(d.get("prix")),
+            compte_id=email.compte_id,
+            date_mail=email.date,
         )
         choix = rapprochement.choix_automatique(liste)
         if choix is None:
             email.statut_traitement = StatutTraitementEmail.NOUVEAU  # -> « Ventes à confirmer »
-            notifier(db, "vente", "Nouvelle vente à confirmer", "/ventes", corps=d.get("titre_article") or "")
+            notifier(db, "vente", "Vente à confirmer", "/ventes", corps=d.get("titre_article") or "")
             return
         article = db.get(Article, choix.article_id)
         assert article is not None
@@ -128,6 +146,8 @@ def _decimal(v: Any) -> Decimal | None:
 def confirmer_vente(db: Session, email: EmailVinted, article: Article, auto: bool) -> Vente:
     d = email.donnees_extraites or {}
     quand = email.date or utcnow()
+    if article.statut in rapprochement.STATUTS_A_COMPLETER:
+        return _completer_vente_importee(db, email, article, auto)
     prix = _decimal(d.get("prix")) or article.prix_vente_cible or Decimal("0")
     vente = Vente(
         article_id=article.id,
@@ -166,10 +186,67 @@ def confirmer_vente(db: Session, email: EmailVinted, article: Article, auto: boo
     return vente
 
 
+def _dater_passage_vendu(db: Session, article: Article, quand: datetime, commentaire: str) -> None:
+    passage = db.scalar(
+        select(HistoriqueStatut)
+        .where(
+            HistoriqueStatut.article_id == article.id, HistoriqueStatut.nouveau_statut == StatutArticle.VENDU
+        )
+        .order_by(HistoriqueStatut.date.desc())
+    )
+    if passage is not None:
+        passage.date = quand
+        passage.commentaire = commentaire
+
+
+def _completer_vente_importee(db: Session, email: EmailVinted, article: Article, auto: bool) -> Vente:
+    """Article déjà vendu à l'import (date estimée) : le mail donne la vraie date, le prix et l'acheteur.
+    Le statut ne change pas ; les mails d'expédition et de livraison qui suivent mettent l'envoi à jour."""
+    d = email.donnees_extraites or {}
+    quand = email.date or utcnow()
+    prix = _decimal(d.get("prix")) or article.prix_vente_reel or article.prix_vente_cible or Decimal("0")
+    vente = Vente(
+        article_id=article.id,
+        prix=prix,
+        date_heure=quand,
+        numero_commande=d.get("numero_commande"),
+        acheteur=d.get("acheteur"),
+        email_id=email.id,
+        auto_rapproche=auto,
+        date_estimee_import=article.date_vente or quand,
+    )
+    db.add(vente)
+    db.flush()
+    ancienne = article.date_vente
+    article.date_vente = quand
+    article.prix_vente_reel = prix
+    if article.compte_id is None:
+        article.compte_id = email.compte_id
+    _dater_passage_vendu(db, article, quand, "Date de vente corrigée d'après le mail Vinted")
+    log.info("vente_completee", article=article.id, ancienne_date=str(ancienne), date=str(quand))
+    statut_envoi = {
+        StatutArticle.ENVOYE: StatutEnvoi.DEPOSE,
+        StatutArticle.LIVRE: StatutEnvoi.LIVRE,
+    }.get(StatutArticle(article.statut), StatutEnvoi.A_IMPRIMER)
+    limite = _date(d.get("date_limite")) or classifieur.ajouter_jours_ouvres(quand, DELAI_ENVOI_JOURS_OUVRES)
+    envoi = Envoi(vente_id=vente.id, date_limite_envoi=limite, statut=statut_envoi)
+    db.add(envoi)
+    db.flush()
+    email.vente_id = vente.id
+    email.article_id = article.id
+    email.statut_traitement = StatutTraitementEmail.TRAITE
+    _rattacher_bordereau(db, envoi, email)
+    return vente
+
+
 def annuler_vente(db: Session, vente: Vente) -> None:
     """Annule un rapprochement : l'article repasse en ligne et le mail revient « à confirmer »."""
     article = db.get(Article, vente.article_id)
-    if article is not None:
+    if article is not None and vente.date_estimee_import is not None:
+        # Vente importée : l'article reste vendu, avec sa date estimée d'origine.
+        article.date_vente = vente.date_estimee_import
+        _dater_passage_vendu(db, article, vente.date_estimee_import, "Import Excel (date estimée)")
+    elif article is not None:
         changer_statut(db, article, StatutArticle.EN_LIGNE, commentaire="Rapprochement annulé")
         article.date_vente = None
         article.prix_vente_reel = None

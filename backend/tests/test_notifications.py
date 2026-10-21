@@ -17,7 +17,7 @@ from app.config import get_settings
 from app.db import utcnow
 from app.models import AbonnementPush, Article, Envoi, Utilisateur, Vente
 from app.seed.demo import installer_demo
-from app.services import push
+from app.services import push, traitement
 from app.services.email_parser import lire_mail
 from app.services.traitement import enregistrer_mail
 from tests import mails_synthetiques as ms
@@ -33,6 +33,8 @@ def envois(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     monkeypatch.setattr(get_settings(), "vapid_private_key", privee)
     captures: list[dict[str, Any]] = []
     monkeypatch.setattr(push, "webpush", lambda **kw: captures.append(kw))
+    # Les mails synthétiques sont datés du 20/10/2026 : ils doivent rester « récents » pour notifier.
+    monkeypatch.setattr(traitement, "AGE_MAX_NOTIFICATION_JOURS", 100_000)
     return captures
 
 
@@ -80,6 +82,24 @@ def test_vente_detectee_notifie_apres_commit(db: Session, regles: None, envois: 
     ]
     enregistrer_mail(db, lire_mail(ms.LITIGE))
     assert json.loads(envois[-1]["data"])["titre"] == "Nouveau litige"
+
+
+def test_vieux_mails_ne_notifient_pas(
+    db: Session, regles: None, envois: list[dict[str, Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(traitement, "AGE_MAX_NOTIFICATION_JOURS", 2)
+    db.add(AbonnementPush(endpoint=ABONNEMENT["endpoint"], p256dh="x" * 20, auth="y" * 10))
+    db.add(
+        Article(nom="Pull demi-zip polaire Ralph Lauren - Noir", prix_vente_cible=D("45"), statut="en_ligne")
+    )
+    db.commit()
+    vieux = ms.mail(
+        "Ton article a été vendu !",
+        "claire_75 a acheté ton article « Pull demi-zip polaire Ralph Lauren - Noir ».\nPrix : 45,00 €",
+        date=utcnow() - timedelta(days=10),
+    )
+    assert enregistrer_mail(db, lire_mail(vieux)) is not None
+    assert db.scalar(select(func.count(Vente.id))) == 1 and envois == []
 
 
 def test_preferences_desactivent_un_type(

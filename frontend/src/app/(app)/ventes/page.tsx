@@ -118,6 +118,11 @@ export default function PageVentes() {
                       <span className="min-w-0 flex-1 truncate">
                         {c.nom}
                         {c.taille && <span className="text-muted-foreground"> · {c.taille}</span>}
+                        {c.deja_vendu && (
+                          <span className="ml-2 rounded-md bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+                            déjà vendu · corrige la date
+                          </span>
+                        )}
                       </span>
                       <span className="text-muted-foreground tabular-nums">{formatEuros(c.prix_vente)}</span>
                       <span
@@ -135,7 +140,7 @@ export default function PageVentes() {
                   <div className="pt-1">
                     <SelecteurArticle
                       libelle={v.candidats.length ? "Un autre article…" : "Choisir l'article vendu…"}
-                      statuts={["en_ligne", "recu_a_publier"]}
+                      statuts={["en_ligne", "recu_a_publier", "vendu", "envoye", "livre"]}
                       onChoix={(a) => confirmer.mutate({ email_id: v.email_id, article_id: a.id })}
                     />
                   </div>
