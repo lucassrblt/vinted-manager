@@ -13,7 +13,7 @@
 - **Interface** : recherche globale Cmd/Ctrl+K, thème clair/sombre, sidebar repliable, vue mobile en cartes, skeletons, états vides, toasts.
 
 ### Tests
-- Backend : 56 tests pytest, ruff et mypy OK. Couverture : calculs, remise, déduction marque/catégorie/couleur, import du vrai Excel avec totaux identiques à la synthèse (investi 800,90 €, CA 814,70 €, stock 453,52 €), export puis réimport, auth (cookie, blocage, expiration, renouvellement), API stock, batches, preuves, compta, URSSAF.
+- Backend : 58 tests pytest, ruff et mypy OK. Couverture : calculs, remise, déduction marque/catégorie/couleur, import du vrai Excel avec totaux identiques à la synthèse (investi 800,90 €, CA 814,70 €, stock 453,52 €), export puis réimport, auth (cookie, blocage, expiration, renouvellement), API stock, batches, preuves, compta, URSSAF.
 - Frontend : 11 tests Vitest, ESLint, Prettier, `tsc` et build Next OK.
 - E2E Playwright : connexion puis import (`frontend/e2e/parcours.spec.ts`).
 
@@ -31,7 +31,8 @@
 - **Onglet « Batch 2 »** : il sert seulement à compléter le prix de vente cible des articles non vendus de « Batch 2 ».
 - **Batch 1** n'a pas de prix brut : brut = net et remise = 0. La remise globale d'un batch importé est la somme des remises par ligne.
 - **Prix de vente** : `prix_vente_reel` pour un article vendu, sinon `prix_vente_cible`. Marge et coefficient s'affichent aussi sur le prix cible (prévisionnel).
-- **Ventes importées sans date** : elles comptent dans la vue « Tout » de la compta mais dans aucune période ; aucune ligne `Vente` n'est créée pour elles (la table `Vente` sert aux ventes détectées par mail).
+- **Les 2 lignes incohérentes sont bien vendues** (confirmé le 21/10/2026).
+- **Ventes importées sans date** : à l'import, chaque vente reçoit une date tirée au hasard entre le 01/10/2026 et le 16/10/2026 (période modifiable dans l'aperçu), entre 9 h et 22 h (heure de Paris), jamais avant la date d'achat. Ces articles portent la note « date de vente estimée ». Aucune ligne `Vente` n'est créée pour eux (la table `Vente` sert aux ventes détectées par mail).
 - **Compta** : les flux (CA, marge réalisée, cotisations) sont filtrés sur la date de vente (Europe/Paris). Les valeurs de stock (investi, stock, coefficient global, sell-through) sont un instantané à date.
 - **Sell-through** = vendus / publiés, comme demandé. L'Excel affichait vendus / total (44,8 %) ; l'app affiche 78,8 %.
 - **Import unique** : refusé si des articles existent déjà.

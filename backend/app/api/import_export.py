@@ -18,6 +18,8 @@ XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 class CommitIn(BaseModel):
     lignes: list[excel_import.LigneImport]
     pistes: list[excel_import.PisteImport]
+    # Ventes sans date dans l'Excel : date tirée au hasard dans cette période (None = pas de date)
+    periode_ventes: excel_import.PeriodeVentes | None = None
 
 
 class EtatImport(BaseModel):
@@ -47,7 +49,7 @@ async def apercu(fichier: UploadFile = File(...)) -> excel_import.ApercuImport:
 @router.post("/import/excel/commit")
 def valider(data: CommitIn, db: Db) -> dict[str, int]:
     try:
-        resultat = excel_import.ecrire_import(db, data.lignes, data.pistes)
+        resultat = excel_import.ecrire_import(db, data.lignes, data.pistes, data.periode_ventes)
     except excel_import.ErreurImport as exc:
         db.rollback()
         raise HTTPException(422, str(exc)) from exc

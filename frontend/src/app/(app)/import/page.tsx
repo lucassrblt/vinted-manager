@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { EnTetePage } from "@/components/commun";
 import { CelluleEditable } from "@/components/stock/cellule-editable";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -51,7 +52,16 @@ export default function PageImport() {
   const invalider = useInvaliderStock();
   const [apercu, setApercu] = useState<ApercuImport | null>(null);
   const [problemesSeuls, setProblemesSeuls] = useState(false);
-  const [resultat, setResultat] = useState<{ articles: number; batches: number; pistes: number } | null>(null);
+  // Les ventes de l'Excel n'ont pas de date : on les date au hasard dans cette période (modifiable).
+  const [daterVentes, setDaterVentes] = useState(true);
+  const [ventesDu, setVentesDu] = useState("2026-10-01");
+  const [ventesAu, setVentesAu] = useState("2026-10-16");
+  const [resultat, setResultat] = useState<{
+    articles: number;
+    batches: number;
+    pistes: number;
+    ventes_datees: number;
+  } | null>(null);
   const etat = useQuery({
     queryKey: ["import", "etat"],
     queryFn: () => api<{ deja_importe: boolean }>("/import/etat"),
@@ -72,8 +82,12 @@ export default function PageImport() {
 
   const validation = useMutation({
     mutationFn: () =>
-      api<{ articles: number; batches: number; pistes: number }>("/import/excel/commit", {
-        body: { lignes: apercu!.lignes, pistes: apercu!.pistes },
+      api<{ articles: number; batches: number; pistes: number; ventes_datees: number }>("/import/excel/commit", {
+        body: {
+          lignes: apercu!.lignes,
+          pistes: apercu!.pistes,
+          periode_ventes: daterVentes ? { du: ventesDu, au: ventesAu } : null,
+        },
       }),
     onSuccess: (r) => {
       setResultat(r);
@@ -141,6 +155,7 @@ export default function PageImport() {
               <p className="text-sm text-muted-foreground">
                 {resultat.articles} articles, {resultat.batches} batches et {resultat.pistes} pistes de sourcing
                 importés.
+                {resultat.ventes_datees > 0 && ` ${resultat.ventes_datees} ventes datées au hasard.`}
               </p>
             </div>
           </div>
@@ -218,6 +233,36 @@ export default function PageImport() {
             </div>
           </div>
 
+          <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 sm:flex-row sm:items-center">
+            <label className="flex items-center gap-2 text-sm">
+              <Switch checked={daterVentes} onCheckedChange={setDaterVentes} />
+              Dater au hasard les {apercu.lignes.filter((l) => l.statut === "vendu").length} ventes, entre
+            </label>
+            <div className="flex items-center gap-2">
+              <Input
+                type="date"
+                value={ventesDu}
+                onChange={(e) => setVentesDu(e.target.value)}
+                disabled={!daterVentes}
+                className="h-8 w-40"
+                aria-label="Début de la période des ventes"
+              />
+              <span className="text-sm text-muted-foreground">et</span>
+              <Input
+                type="date"
+                value={ventesAu}
+                onChange={(e) => setVentesAu(e.target.value)}
+                disabled={!daterVentes}
+                className="h-8 w-40"
+                aria-label="Fin de la période des ventes"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground sm:ml-auto sm:max-w-56">
+              Jamais avant la date d&apos;achat. Sans date, les ventes n&apos;apparaissent dans aucune période de la
+              compta.
+            </p>
+          </div>
+
           <div className="flex flex-wrap items-center justify-between gap-3">
             <label className="flex items-center gap-2 text-sm">
               <Switch checked={problemesSeuls} onCheckedChange={setProblemesSeuls} />
@@ -227,7 +272,14 @@ export default function PageImport() {
               <Button variant="outline" onClick={() => setApercu(null)}>
                 Annuler
               </Button>
-              <Button onClick={() => validation.mutate()} disabled={stats.erreurs > 0 || validation.isPending}>
+              <Button
+                onClick={() => validation.mutate()}
+                disabled={
+                  stats.erreurs > 0 ||
+                  validation.isPending ||
+                  (daterVentes && (!ventesDu || !ventesAu || ventesDu > ventesAu))
+                }
+              >
                 {validation.isPending && <Loader2 className="animate-spin" />}
                 Valider l&apos;import
               </Button>

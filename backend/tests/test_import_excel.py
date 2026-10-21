@@ -64,7 +64,7 @@ def test_import_complet_et_totaux_identiques_a_excel(
     apercu = _apercu(client, excel_reel)
     r = client.post("/api/import/excel/commit", json={"lignes": apercu["lignes"], "pistes": apercu["pistes"]})
     assert r.status_code == 200, r.text
-    assert r.json() == {"articles": 58, "batches": 5, "pistes": 25}
+    assert r.json() == {"articles": 58, "batches": 5, "pistes": 25, "ventes_datees": 0}
 
     assert db.scalar(select(func.count(Batch.id))) == 5
     assert db.scalar(select(func.count(HistoriqueStatut.id))) == 58
@@ -134,3 +134,46 @@ def test_export_meme_structure(client: TestClient, excel_reel: bytes) -> None:
     relu = lire_classeur(r.content)
     assert len(relu.lignes) == 58
     assert sum(lg.prix_vente or 0 for lg in relu.lignes if lg.statut == StatutArticle.VENDU) == D("814.70")
+
+
+def test_dates_de_vente_aleatoires(client: TestClient, db: Session, excel_reel: bytes) -> None:
+    from zoneinfo import ZoneInfo
+
+    apercu = _apercu(client, excel_reel)
+    r = client.post(
+        "/api/import/excel/commit",
+        json={
+            "lignes": apercu["lignes"],
+            "pistes": [],
+            "periode_ventes": {"du": "2026-10-01", "au": "2026-10-16"},
+        },
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["ventes_datees"] == 26
+    paris = ZoneInfo("Europe/Paris")
+    vendus = db.scalars(select(Article).where(Article.statut == "vendu")).all()
+    for a in vendus:
+        assert a.date_vente is not None
+        jour = a.date_vente.astimezone(paris)
+        assert "2026-10-01" <= jour.date().isoformat() <= "2026-10-16"
+        assert 9 <= jour.hour < 22
+        if a.date_achat:  # jamais vendu avant d'avoir été acheté
+            assert jour.date() >= a.date_achat
+    # Les non-vendus n'ont pas de date de vente
+    assert all(a.date_vente is None for a in db.scalars(select(Article).where(Article.statut != "vendu")))
+    # Toutes les ventes tombent en octobre : même CA que la synthèse Excel
+    k = client.get("/api/compta/kpis", params={"du": "2026-10-01", "au": "2026-10-31"}).json()
+    assert D(k["ca_encaisse"]) == D("814.70") and k["ventes_sans_date"] == 0
+
+
+def test_periode_ventes_invalide(client: TestClient, excel_reel: bytes) -> None:
+    apercu = _apercu(client, excel_reel)
+    r = client.post(
+        "/api/import/excel/commit",
+        json={
+            "lignes": apercu["lignes"],
+            "pistes": [],
+            "periode_ventes": {"du": "2026-10-16", "au": "2026-10-01"},
+        },
+    )
+    assert r.status_code == 422

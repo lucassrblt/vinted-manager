@@ -4,18 +4,21 @@
 """
 
 import io
+import random
 import re
 from collections import Counter, defaultdict
 from collections.abc import Mapping
-from datetime import date, datetime
+from datetime import date, datetime, time, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any, Literal
+from zoneinfo import ZoneInfo
 
 from openpyxl import load_workbook
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.models import Article, Batch, HistoriqueStatut, PisteSourcing
 from app.models.enums import StatutArticle
 from app.services import calculs, marques
@@ -98,6 +101,13 @@ class ApercuImport(BaseModel):
     pistes: list[PisteImport]
     onglets_lus: list[str]
     onglets_absents: list[str]
+
+
+class PeriodeVentes(BaseModel):
+    """Période dans laquelle tirer au hasard la date des ventes que l'Excel ne date pas."""
+
+    du: date
+    au: date
 
 
 class ErreurImport(ValueError):
@@ -393,7 +403,24 @@ def base_deja_importee(db: Session) -> bool:
     return (db.scalar(select(func.count(Article.id))) or 0) > 0
 
 
-def ecrire_import(db: Session, lignes: list[LigneImport], pistes: list[PisteImport]) -> dict[str, int]:
+def date_vente_aleatoire(periode: PeriodeVentes, date_achat: date | None, rng: random.Random) -> datetime:
+    """Jour au hasard dans la période (jamais avant l'achat), entre 9 h et 22 h, heure de Paris."""
+    debut = max(periode.du, date_achat) if date_achat else periode.du
+    fin = max(debut, periode.au)
+    jour = debut + timedelta(days=rng.randint(0, (fin - debut).days))
+    minutes = rng.randint(9 * 60, 22 * 60 - 1)
+    local = datetime.combine(jour, time(minutes // 60, minutes % 60), ZoneInfo(get_settings().timezone))
+    return local.astimezone(ZoneInfo("UTC"))
+
+
+def ecrire_import(
+    db: Session,
+    lignes: list[LigneImport],
+    pistes: list[PisteImport],
+    periode_ventes: PeriodeVentes | None = None,
+) -> dict[str, int]:
+    if periode_ventes and periode_ventes.du > periode_ventes.au:
+        raise ErreurImport("La période des ventes est invalide (début après la fin).")
     lignes = [verifier_ligne(lg) for lg in lignes]
     bloquantes = [lg for lg in lignes if any(a.niveau == "erreur" for a in lg.anomalies)]
     if bloquantes:
@@ -421,9 +448,15 @@ def ecrire_import(db: Session, lignes: list[LigneImport], pistes: list[PisteImpo
         db.add(batch)
         batches[nom] = batch
 
+    rng = random.Random()
+    ventes_datees = 0
     for lg in lignes:
         assert lg.statut is not None
         vendu = lg.statut == StatutArticle.VENDU
+        date_vente = (
+            date_vente_aleatoire(periode_ventes, lg.date_achat, rng) if vendu and periode_ventes else None
+        )
+        ventes_datees += date_vente is not None
         article = Article(
             nom=lg.nom.strip(),
             marque=lg.marque,
@@ -442,20 +475,28 @@ def ecrire_import(db: Session, lignes: list[LigneImport], pistes: list[PisteImpo
             batch=batches.get(lg.batch) if lg.batch else None,
             source=lg.source,
             date_achat=lg.date_achat,
-            notes=f"Importé depuis l'Excel (ligne {lg.ligne})",
+            date_vente=date_vente,
+            notes=f"Importé depuis l'Excel (ligne {lg.ligne})"
+            + (" · date de vente estimée" if date_vente else ""),
         )
         db.add(article)
-        db.add(
-            HistoriqueStatut(
-                article=article,
-                ancien_statut=None,
-                nouveau_statut=lg.statut,
-                commentaire="Import Excel",
-            )
+        historique = HistoriqueStatut(
+            article=article,
+            ancien_statut=None,
+            nouveau_statut=lg.statut,
+            commentaire="Import Excel" + (" (date estimée)" if date_vente else ""),
         )
+        if date_vente:
+            historique.date = date_vente
+        db.add(historique)
 
     for p in pistes:
         db.add(PisteSourcing(**p.model_dump()))
 
     db.commit()
-    return {"articles": len(lignes), "batches": len(batches), "pistes": len(pistes)}
+    return {
+        "articles": len(lignes),
+        "batches": len(batches),
+        "pistes": len(pistes),
+        "ventes_datees": ventes_datees,
+    }
