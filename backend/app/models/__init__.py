@@ -1,4 +1,4 @@
-from app.models.stock import Article, Batch, HistoriqueStatut, PisteSourcing, PreuveAchat
+from app.models.stock import Article, Batch, HistoriqueStatut, PhotoArticle, PisteSourcing, PreuveAchat
 from app.models.systeme import (
     AbonnementPush,
     ModeleAnnonce,
@@ -21,6 +21,7 @@ __all__ = [
     "ModeleAnnonce",
     "ModeleReponse",
     "Parametres",
+    "PhotoArticle",
     "PieceJointe",
     "PisteSourcing",
     "PreuveAchat",

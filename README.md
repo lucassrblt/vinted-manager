@@ -79,6 +79,7 @@ npm run e2e   # app lancée, base vide, utilisateur demo@example.com / demo-motd
    | `LOG_LEVEL` | `INFO` |
    | `ANTHROPIC_API_KEY` | clé API Anthropic (console.anthropic.com), pour les annonces et réponses |
    | `ANTHROPIC_MODEL` | `claude-haiku-5-5` (optionnel) |
+   | `REPLICATE_API_TOKEN` | token Replicate (replicate.com → Account → API tokens), pour la retouche des photos |
    | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | notifications push (voir plus bas) |
 
 6. **Settings → Networking → Generate Domain** pour obtenir l'URL publique, par exemple `https://revente-backend.up.railway.app`.
@@ -115,6 +116,15 @@ Garde ces clés en lieu sûr : sans la même `FERNET_KEY`, les identifiants IMAP
 2. **iPhone** : dans Safari, bouton Partager → « Sur l'écran d'accueil », puis ouvre Revente **depuis l'icône** (sur iPhone, les notifications ne fonctionnent que dans l'app installée). **Android** : menu de Chrome → « Installer l'application ».
 3. Dans l'app : Paramètres → Notifications → « Activer les notifications sur cet appareil », puis « Envoyer une notification de test ».
 4. Choisis les notifications voulues : nouvelle vente, nouveau litige, nouvelle offre, rappel de 9 h des colis à envoyer.
+
+### Photos des articles (retouche IA)
+
+1. Paramètres → Photos : dépose une photo de ton tapis **seul**, prise de dessus, qui remplit tout le cadre. Elle sert de fond à toutes les photos.
+2. Sur la fiche article (ou dans le générateur d'annonce) : dépose les photos **devant, dos, étiquette, logo**, ou toutes d'un coup, et éventuellement des photos de **défaut**, qui ne sont jamais retouchées.
+3. Clique sur « Retoucher les photos ». Compte ~10 s par photo, et environ 0,07 $ par photo avec Nano Banana 2.
+4. Vérifie chaque photo (bascule Originale / Retouchée, « Régénérer » pour une autre disposition), puis « Tout télécharger » pour récupérer le zip dans l'ordre Vinted.
+
+Avec moins de 5 $ de crédit, Replicate limite à 6 générations par minute : l'app attend automatiquement, mais la génération est alors plus lente.
 
 ### Sauvegarde
 

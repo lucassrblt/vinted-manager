@@ -9,6 +9,7 @@ import { toast } from "sonner";
 
 import { IndicateurBadge, LignesSquelette, MessageErreur, StatutBadge } from "@/components/commun";
 import { CelluleEditable } from "@/components/stock/cellule-editable";
+import { PhotosArticle } from "@/components/photos/photos-article";
 import { ZonePreuves } from "@/components/stock/preuves";
 import {
   AlertDialog,
@@ -325,6 +326,10 @@ export default function FicheArticle() {
                 }}
               />
             </div>
+          </Bloc>
+
+          <Bloc titre="Photos de l'annonce">
+            <PhotosArticle articleId={id} />
           </Bloc>
 
           <Bloc

@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-haiku-5-5"
     ia_factice: bool = False
+    # Photos IA (Replicate)
+    replicate_api_token: str = ""
     # Notifications push (étape 4)
     vapid_public_key: str = ""
     vapid_private_key: str = ""

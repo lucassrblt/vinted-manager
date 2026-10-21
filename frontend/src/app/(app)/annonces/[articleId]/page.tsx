@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 import { LignesSquelette, MessageErreur, StatutBadge } from "@/components/commun";
+import { PhotosArticle } from "@/components/photos/photos-article";
 import { Champ } from "@/components/stock/dialog-article";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -152,6 +153,11 @@ export default function GenerateurAnnonce() {
           l&apos;annonce à la main et la publier.
         </p>
       )}
+
+      <section className="rounded-xl border bg-card p-4 md:p-5">
+        <h2 className="mb-3 text-sm font-semibold">Photos</h2>
+        <PhotosArticle articleId={id} />
+      </section>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
         <section className="space-y-4 rounded-xl border bg-card p-4 md:p-5">

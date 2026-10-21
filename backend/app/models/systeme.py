@@ -87,6 +87,9 @@ class Parametres(Base):
     imap_dossier: Mapped[str] = mapped_column(String(255), default="INBOX")
     expediteurs_vinted: Mapped[list[str]] = mapped_column(JSON, default=lambda: ["vinted.fr", "vinted.com"])
     derniere_synchro: Mapped[datetime | None]
+    # Photos IA : modèle Replicate et photo du fond (tapis) servant de référence
+    modele_photos: Mapped[str] = mapped_column(String(120), default="google/nano-banana-2")
+    photo_fond: Mapped[str | None] = mapped_column(String(500))
     notifications: Mapped[dict[str, Any]] = mapped_column(
         JSON,
         default=lambda: {"vente": True, "litige": True, "offre": True, "rappel_envois": True},

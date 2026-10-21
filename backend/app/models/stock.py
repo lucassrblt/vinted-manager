@@ -111,3 +111,28 @@ class PisteSourcing(TimestampMixin, Base):
     priorite: Mapped[str | None] = mapped_column(String(30))
     quantite_test: Mapped[str | None] = mapped_column(String(30))
     commentaire: Mapped[str | None] = mapped_column(Text)
+
+
+class PhotoArticle(TimestampMixin, Base):
+    """Photo d'un article : l'original déposé et, sauf pour un défaut, sa version retouchée par l'IA."""
+
+    __tablename__ = "photo_article"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    article_id: Mapped[int] = mapped_column(ForeignKey("article.id", ondelete="CASCADE"), index=True)
+    type: Mapped[str] = mapped_column(String(20))  # devant | dos | etiquette | logo | detail | defaut
+    ordre: Mapped[int] = mapped_column(default=0)
+    fichier_original: Mapped[str] = mapped_column(String(500))
+    fichier_genere: Mapped[str | None] = mapped_column(String(500))
+    # a_generer | en_cours | genere | erreur | original (défaut : jamais retouché)
+    statut: Mapped[str] = mapped_column(String(20), default="a_generer")
+    version_choisie: Mapped[str] = mapped_column(String(10), default="genere")  # genere | original
+    modele: Mapped[str | None] = mapped_column(String(120))
+    disposition: Mapped[str | None] = mapped_column(Text)
+    prediction_id: Mapped[str | None] = mapped_column(String(80))
+    nb_generations: Mapped[int] = mapped_column(default=0)
+    cout_estime: Mapped[Decimal] = mapped_column(
+        Numeric(10, 4), default=Decimal("0")
+    )  # USD, prix à 3 décimales
+    erreur: Mapped[str | None] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)

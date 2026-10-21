@@ -138,6 +138,39 @@
 - **Rappel de 9 h** : envoyé seulement s'il y a des colis du jour ou en retard (pas de notification « rien à faire »).
 - **Sauvegarde** : génération dans un fichier temporaire supprimé après le téléchargement ; les tables de session et de tentatives de connexion sont exclues, ainsi que le hash du mot de passe et le mot de passe IMAP chiffré.
 
+## Photos IA (ajout du 21/10/2026) ✅
+
+### Fait
+- **Photos par article** (fiche article et générateur d'annonce) : 4 emplacements (devant, dos, étiquette, logo), dépôt groupé, détails, et photos de défaut publiées telles quelles. Bascule Originale / Retouchée, régénération photo par photo, zip numéroté dans l'ordre Vinted, coût affiché.
+- **Retouche via Replicate**, modèle configurable (Paramètres → Photos), **Nano Banana 2** par défaut :
+  - le fond est toujours la photo de tapis des paramètres ;
+  - la disposition (manches, rotation, cadrage) est tirée au hasard pour chaque photo, avec la même lumière sur toute l'annonce ;
+  - consigne stricte de fidélité (couleur, texte d'étiquette, logo, usure, défauts) ;
+  - pour les gros plans, la photo « devant » sert de référence de couleur, et l'IA a interdiction d'élargir le cadrage.
+- **Préparation des photos** (Pillow) : redressement selon l'orientation EXIF, réduction à 2048 px, conversion en JPEG et suppression de toutes les métadonnées, **dont le GPS**, avant stockage et envoi.
+- **Génération en tâche de fond** avec suivi de l'avancement, limite de débit Replicate respectée (attente et nouvel essai sur une erreur 429), erreurs claires (token, crédit épuisé, délai dépassé).
+
+### Comparatif réalisé sur tes photos (coût total des essais ≈ 0,90 $)
+| Modèle | Prix / photo | Résultat |
+|---|---|---|
+| Nano Banana 2 | ~0,067 $ | **Le plus fidèle** : tapis respecté, vêtement identique, texte d'étiquette lisible |
+| Seedream 5 Lite | ~0,035 $ | Bon sur les vues entières, mais texte d'étiquette déformé |
+| FLUX.2 [dev] | ~0,02 $ | Fond inventé (moquette, fenêtre) : écarté |
+| Qwen Edit Plus | ~0,03 $ | Mur et parquet ajoutés, vue de biais : écarté |
+
+Coût estimé : **~0,27 $ par article** (4 photos), ~0,40 $ avec des régénérations, soit 27 à 40 $ pour 100 articles.
+
+### Points de vigilance
+- Les tout petits textes d'étiquette (tableau des tailles) peuvent être approximatifs : **toujours comparer avec l'original avant de publier**.
+- Lors d'un essai, l'IA a inventé un col sur un gros plan de hoodie ; la consigne interdit maintenant d'élargir le cadrage. La relecture reste indispensable.
+- Les photos de défaut ne sont jamais envoyées à l'IA.
+
+### Décisions prises
+- **Résolution 1K** (896 × 1200) : prix de base, suffisant pour Vinted.
+- **Fond de démarrage** : sans photo du tapis seul, une version « tapis vide » a été générée à partir de ton exemple réussi. Remplace-la par une vraie photo du tapis pour un rendu encore plus juste.
+- **Article de test** « Hoodie Adidas Originals - gris (test photos) » créé en local : à supprimer.
+- `httpx` passé en dépendance de production (il manquait dans l'image Docker : attrapé au premier démarrage).
+
 ## État général
 
 Les 4 étapes du cahier des charges sont faites. Ce qui reste à valider avec tes vraies données :

@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { EnTetePage, LignesSquelette } from "@/components/commun";
 import { ConfigurationImap } from "@/components/mails/config-imap";
 import { ParametresNotifications } from "@/components/parametres/notifications";
+import { ParametresPhotosIa } from "@/components/parametres/photos";
 import { Champ } from "@/components/stock/dialog-article";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -121,6 +122,7 @@ function ContenuParametres() {
           <TabsTrigger value="general">Général</TabsTrigger>
           <TabsTrigger value="mails">Mails</TabsTrigger>
           <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="photos">Photos</TabsTrigger>
           <TabsTrigger value="sauvegarde">Sauvegarde</TabsTrigger>
         </TabsList>
         <TabsContent value="general" className="mt-5">
@@ -170,6 +172,9 @@ function ContenuParametres() {
         </TabsContent>
         <TabsContent value="notifications" className="mt-5">
           <ParametresNotifications />
+        </TabsContent>
+        <TabsContent value="photos" className="mt-5">
+          <ParametresPhotosIa />
         </TabsContent>
         <TabsContent value="sauvegarde" className="mt-5">
           <Sauvegarde />
