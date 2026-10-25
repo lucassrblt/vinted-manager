@@ -25,6 +25,7 @@ from app.services import (
     storage,
 )
 from app.services import assistant as _assistant  # noqa: F401  (enregistre ses événements et résultats)
+from app.services import baisse_prix as _baisse_prix  # noqa: F401  (résultat des baisses de prix)
 from app.services import dressing as _dressing  # noqa: F401  (enregistre l'événement « dressing »)
 from app.services import favoris as _favoris  # noqa: F401  (événement « notifications », relances)
 from app.services import republication as _republication  # noqa: F401  (contrôle et résultat des republications)

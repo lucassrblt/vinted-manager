@@ -99,6 +99,14 @@ export function BlocVinted({ article: a }: { article: Article }) {
           </dd>
         </>
       )}
+      {a.prix_avant_baisse && (
+        <>
+          <dt className="text-muted-foreground">Baisse auto</dt>
+          <dd className="tabular-nums">
+            {formatEuros(a.prix_avant_baisse)} → {formatEuros(a.prix_vente_cible)}
+          </dd>
+        </>
+      )}
       {a.prix_initial && (
         <>
           <dt className="text-muted-foreground">Prix initial</dt>

@@ -9,6 +9,7 @@ import { verifierCompte } from "./vinted/compte";
 import { lireDressing } from "./vinted/dressing";
 import { lireNotifications, relancer } from "./vinted/favoris";
 import { ErreurAction, ErreurVinted } from "./vinted/erreurs";
+import { modifierPrix } from "./vinted/prix";
 import { type ChargeRepublication, ErreurPartielle, republier } from "./vinted/republication";
 import {
   accepterOffre,
@@ -35,6 +36,7 @@ export const EXECUTEURS: Record<string, Executeur> = {
   accepter_offre: (t, e) => accepterOffre(t.payload, e),
   refuser_offre: (t, e) => refuserOffre(t.payload, e),
   contre_offre: (t, e) => contreOffre(t.payload, e),
+  modifier_prix: (t, e) => modifierPrix(t.payload, e),
   republication: (t, e) =>
     republier(t.payload as unknown as ChargeRepublication, {
       client: e.client,

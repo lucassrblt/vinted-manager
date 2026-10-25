@@ -546,3 +546,41 @@ déployé. `main` n'a pas été touchée ; la branche vit dans un worktree sépa
    attendre la republication : nouvelle annonce publiée, ancienne supprimée, photos légèrement différentes.
 2. **Point de vigilance de la spécification** : comparer vues et favoris (fiche article → bloc Vinted) avant et après
    quelques republications pour mesurer l'efficacité des transformations.
+
+## Phase 6 : baisse de prix automatique ✅
+
+### Fait
+- **Backend** (`services/baisse_prix.py`, toutes les heures) : −5 % (réglable) une seule fois par article, entre 48 et
+  72 h après la publication (délai propre à chaque article, tiré dans la plage), arrondi aux 50 centimes, jamais sous
+  le plancher, jamais après une republication. Tâche `modifier_prix` (priorité 5) avec le prix attendu et le nouveau
+  prix ; le prix de l'article est mis à jour au résultat (ancien prix gardé).
+- **Extension** : relecture de l'annonce (`GET /api/v2/items/{id}`), contrôle du prix actuel (modifié à la main
+  entre-temps → rien n'est fait), reconstruction de l'objet `item` **complet** (même forme que la capture du site),
+  puis `PUT /api/v2/item_upload/items/{id}` avec un nouveau `temp_uuid` et `push_up: false`.
+- **Champ manquant** à la relecture : aucun `PUT`, la tâche passe en erreur, le module « prix » est coupé pour ce
+  compte et Lucas reçoit la marche à suivre (capture de la page d'édition, section 13.5).
+- Fiche article : « Baisse auto : 30 € → 28,50 € ».
+
+### Tests
+- Backend : 7 nouveaux tests (`tests/test_baisse_prix.py`) : échéance 48–72 h, une seule fois, trop tôt, trop tard,
+  après une republication, annonce importée, plancher, module coupé, résultat (prix mis à jour, module coupé sur
+  champ manquant). 288 tests au total. Migration `b8f2d5a1c463` vérifiée.
+- Extension : 76 tests, dont l'objet reconstruit **identique à la capture `items_update`** (au prix et au
+  `temp_uuid` près), champs manquants, prix modifié entre-temps.
+
+### Décisions prises (phase 6)
+- **Fenêtre stricte** : un article publié il y a plus de 72 h (+ 24 h de rattrapage si le PC était éteint) n'est pas
+  baissé : pas de baisse en masse des articles déjà en ligne au démarrage.
+- **Annonces importées de Vinted** : date de publication inconnue → pas de baisse automatique.
+- **« Pas de nouvelle baisse après une republication »** : un article déjà republié n'est jamais baissé.
+- Une baisse impossible (déjà au plancher) compte comme faite : l'article n'est plus examiné.
+- **Reconstruction** : `isbn`, mesures, `manufacturer`, `manufacturer_labelling` (toujours nuls dans les captures
+  de vêtements) sont repris s'ils sont présents, nuls sinon ; `ai_photo` vient de vinted-manager (déclaration faite
+  au brouillon) ou de l'annonce lue, sinon champ manquant. Les autres champs sont obligatoires.
+
+### À tester toi-même (phase 6, compte secondaire)
+1. Sur une annonce de test publiée par l'app, attendre 48 à 72 h (ou, pour aller plus vite, réduire
+   « Après (heures) » dans les réglages Prix) : soit le prix baisse sur Vinted, soit l'alerte « Baisse de prix
+   automatique coupée » arrive avec le nom du champ manquant.
+2. Dans ce second cas, capturer le chargement de la page d'édition d'une annonce (DevTools → Réseau, « Conserver le
+   journal », « Save all as HAR ») et me l'envoyer.
