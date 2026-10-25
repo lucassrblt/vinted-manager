@@ -9,8 +9,13 @@ from app.services import reglages
 from app.services.stats import tz
 
 
+def maintenant() -> datetime:
+    """Heure courante (UTC) : point unique, figé dans les tests."""
+    return utcnow()
+
+
 def local(quand: datetime | None = None) -> datetime:
-    return (quand or utcnow()).astimezone(tz())
+    return (quand or maintenant()).astimezone(tz())
 
 
 def bornes(compte: CompteVinted) -> tuple[int, int]:
@@ -36,6 +41,15 @@ def prochaine_ouverture(compte: CompteVinted, quand: datetime | None = None) -> 
 def debut_du_jour(quand: datetime | None = None) -> datetime:
     """Minuit (heure de Paris) du jour de `quand`."""
     return datetime.combine(local(quand).date(), time(0), tzinfo=tz())
+
+
+def debut_heure_suivante(quand: datetime | None = None) -> datetime:
+    return local(quand).replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+
+
+def ouverture_du_lendemain(compte: CompteVinted, quand: datetime | None = None) -> datetime:
+    debut, _ = bornes(compte)
+    return datetime.combine(local(quand).date() + timedelta(days=1), time(debut), tzinfo=tz())
 
 
 def delai(min_s: float, max_s: float, rng: random.Random | None = None) -> timedelta:

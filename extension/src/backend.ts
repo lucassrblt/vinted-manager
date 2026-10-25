@@ -1,4 +1,5 @@
 /** Client du backend vinted-manager, utilisé uniquement par le service worker. */
+import type { Tache } from "./protocole";
 import type { ChargeBrouillon } from "./vinted/brouillon";
 
 export interface CompteBackend {
@@ -9,6 +10,19 @@ export interface CompteBackend {
   pause_raison: string | null;
   brouillons_du_jour: number;
   brouillons_max_jour: number;
+  automatisation_active: boolean;
+  heures_actives: boolean;
+  heure_debut: number;
+  heure_fin: number;
+  modules: Record<string, boolean>;
+}
+
+export interface ResultatTache {
+  ok: boolean;
+  resultat?: Record<string, unknown> | null;
+  erreur?: string;
+  arret?: boolean;
+  erreur_vinted?: boolean;
 }
 
 export class ErreurBackend extends Error {
@@ -68,8 +82,31 @@ export class ClientBackend {
     return (await this.json<CompteBackend>("GET", "/compte"))!;
   }
 
-  async heartbeat(vintedUserId: number | null, login: string | null, version: string): Promise<CompteBackend> {
-    return (await this.json<CompteBackend>("POST", "/heartbeat", { vinted_user_id: vintedUserId, login, version }))!;
+  async heartbeat(
+    vintedUserId: number | null,
+    login: string | null,
+    version: string,
+    onglet: boolean,
+  ): Promise<CompteBackend> {
+    return (await this.json<CompteBackend>("POST", "/heartbeat", {
+      vinted_user_id: vintedUserId,
+      login,
+      version,
+      onglet,
+    }))!;
+  }
+
+  tacheSuivante(): Promise<Tache | null> {
+    return this.json<Tache>("GET", "/taches/suivante");
+  }
+
+  async resultatTache(id: number, r: ResultatTache): Promise<void> {
+    await this.requete("POST", `/taches/${id}/resultat`, r);
+  }
+
+  /** Observation remontée au backend, qui décide ; sa réponse peut demander des lectures à faire. */
+  async evenement<R = Record<string, unknown>>(type: string, donnees: Record<string, unknown>): Promise<R> {
+    return (await this.json<R>("POST", "/evenements", { type, donnees }))!;
   }
 
   async arret(raison: string): Promise<CompteBackend> {

@@ -94,3 +94,56 @@ def heartbeat(client: TestClient, jeton: str, vinted_user_id: int, login: str = 
         headers=entetes(jeton),
     )
     assert r.status_code == 200, r.text
+
+
+class FauxTelegram:
+    """Faux client Telegram : enregistre les envois, renvoie les mises à jour préparées."""
+
+    def __init__(self) -> None:
+        self.messages: list[dict[str, object]] = []
+        self.documents: list[dict[str, object]] = []
+        self.reponses_boutons: list[tuple[str, str]] = []
+        self.a_lire: list[dict[str, object]] = []
+        self.offsets: list[int] = []
+        self.prochain_id = 1
+
+    def envoyer(self, chat_id: str, texte: str, boutons: object = None, silencieux: bool = False) -> None:
+        self.messages.append(
+            {"chat_id": chat_id, "texte": texte, "boutons": boutons, "silencieux": silencieux}
+        )
+
+    def document(
+        self, chat_id: str, nom: str, contenu: bytes, legende: str, silencieux: bool = False
+    ) -> None:
+        self.documents.append({"chat_id": chat_id, "nom": nom, "taille": len(contenu), "legende": legende})
+
+    def repondre_bouton(self, callback_id: str, texte: str) -> None:
+        self.reponses_boutons.append((callback_id, texte))
+
+    def updates(self, offset: int, timeout: int) -> list[dict[str, object]]:
+        self.offsets.append(offset)
+        lus = [u for u in self.a_lire if int(str(u["update_id"])) >= offset]
+        self.a_lire = []
+        return lus
+
+    def ecrire(self, chat_id: str, texte: str) -> None:
+        self.a_lire.append(
+            {"update_id": self.prochain_id, "message": {"chat": {"id": int(chat_id)}, "text": texte}}
+        )
+        self.prochain_id += 1
+
+    def cliquer(self, chat_id: str, donnees: str) -> None:
+        self.a_lire.append(
+            {
+                "update_id": self.prochain_id,
+                "callback_query": {
+                    "id": f"cb{self.prochain_id}",
+                    "data": donnees,
+                    "message": {"chat": {"id": int(chat_id)}},
+                },
+            }
+        )
+        self.prochain_id += 1
+
+    def textes(self, chat_id: str | None = None) -> list[str]:
+        return [str(m["texte"]) for m in self.messages if chat_id is None or m["chat_id"] == chat_id]

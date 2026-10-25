@@ -141,7 +141,7 @@ def _vente(db: Session, email: EmailVinted, article: Article | None) -> None:
                 for x in (d.get("titre_article"), _prix_texte(_decimal(d.get("prix"))), d.get("acheteur"))
                 if x
             )
-            notifier(db, "vente", "🛍️ Vente à confirmer", "/ventes", corps=corps)
+            notifier(db, "vente", "🛍️ Vente à confirmer", "/ventes", corps=corps, compte_id=email.compte_id)
             return
         article = db.get(Article, choix.article_id)
         assert article is not None
@@ -206,7 +206,14 @@ def _nouvelle_vente(db: Session, email: EmailVinted, article: Article, auto: boo
     # Le mail de vente peut contenir directement le bordereau.
     _rattacher_bordereau(db, envoi, email)
     corps = _prix_texte(prix) + (f" · acheté par {vente.acheteur}" if vente.acheteur else "")
-    notifier(db, "vente", f"🛍️ Vendu : {article.nom}", f"/stock/{article.id}", corps=corps)
+    notifier(
+        db,
+        "vente",
+        f"🛍️ Vendu : {article.nom}",
+        f"/stock/{article.id}",
+        corps=corps,
+        compte_id=article.compte_id or email.compte_id,
+    )
     return vente
 
 
@@ -677,6 +684,7 @@ def _litige(db: Session, email: EmailVinted, article: Article | None) -> None:
         "Nouveau litige",
         f"/stock/{article.id}" if article else "/mails",
         corps=article.nom if article else "",
+        compte_id=(article.compte_id if article else None) or email.compte_id,
     )
     if article is None:
         email.statut_traitement = StatutTraitementEmail.NOUVEAU

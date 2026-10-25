@@ -15,6 +15,7 @@ from app.models.systeme import (
     ModeleReponse,
     Parametres,
     SessionUtilisateur,
+    TacheVinted,
     TentativeConnexion,
     Utilisateur,
 )
@@ -41,6 +42,7 @@ __all__ = [
     "RegleClassement",
     "SessionUtilisateur",
     "SyncLog",
+    "TacheVinted",
     "TentativeConnexion",
     "Utilisateur",
     "Vente",

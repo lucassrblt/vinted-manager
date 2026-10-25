@@ -50,11 +50,15 @@ describe("ClientVinted", () => {
       status: 200,
       texte: "<html><title>Captcha</title><script src='https://ct.captcha-delivery.com/c.js'></script></html>",
     }));
-    const err = (await new ClientVinted(faux.fetch, contexte).utilisateurCourant().catch((e: unknown) => e)) as ErreurVinted;
+    const err = (await new ClientVinted(faux.fetch, contexte)
+      .utilisateurCourant()
+      .catch((e: unknown) => e)) as ErreurVinted;
     expect(err.arret).toBe(true);
     expect(err.message).toContain("Captcha");
     faux.sur("GET", /users\/current/, () => ({ status: 502, texte: "Bad gateway" }));
-    const err2 = (await new ClientVinted(faux.fetch, contexte).utilisateurCourant().catch((e: unknown) => e)) as ErreurVinted;
+    const err2 = (await new ClientVinted(faux.fetch, contexte)
+      .utilisateurCourant()
+      .catch((e: unknown) => e)) as ErreurVinted;
     expect(err2.arret).toBe(true);
     expect(err2.message).toContain("non JSON");
   });
@@ -64,7 +68,9 @@ describe("ClientVinted", () => {
       status: 200,
       body: { url: "https://geo.captcha-delivery.com/captcha/?initialCid=x" },
     }));
-    const err = (await new ClientVinted(faux.fetch, contexte).utilisateurCourant().catch((e: unknown) => e)) as ErreurVinted;
+    const err = (await new ClientVinted(faux.fetch, contexte)
+      .utilisateurCourant()
+      .catch((e: unknown) => e)) as ErreurVinted;
     expect(err.arret).toBe(true);
   });
 
@@ -80,7 +86,10 @@ describe("ClientVinted", () => {
   });
 
   it("aucune nouvelle tentative après un échec", async () => {
-    const faux = new FauxVinted().sur("POST", /item_upload\/drafts$/, () => ({ status: 500, body: { message: "erreur" } }));
+    const faux = new FauxVinted().sur("POST", /item_upload\/drafts$/, () => ({
+      status: 500,
+      body: { message: "erreur" },
+    }));
     await new ClientVinted(faux.fetch, contexte).creerBrouillon({} as never, "s").catch(() => undefined);
     expect(faux.ecritures()).toHaveLength(1);
   });
@@ -88,11 +97,21 @@ describe("ClientVinted", () => {
   it("lit le jeton CSRF, l'anon_id et le siid dans la page", () => {
     const doc = {
       querySelector: () => null,
-      documentElement: { innerHTML: '{\\"CSRF_TOKEN\\":\\"abc-123\\",\\"siid\\":\\"0f8c1e2a-1111-4222-8333-444455556666\\"}' },
+      documentElement: {
+        innerHTML: '{\\"CSRF_TOKEN\\":\\"abc-123\\",\\"siid\\":\\"0f8c1e2a-1111-4222-8333-444455556666\\"}',
+      },
       cookie: "v_udt=x; anon_id=9a8b%2Dc; autre=1",
     } as unknown as Document;
-    expect(lireContexte(doc)).toEqual({ csrf: "abc-123", anonId: "9a8b-c", siid: "0f8c1e2a-1111-4222-8333-444455556666" });
-    const meta = { ...doc, querySelector: () => ({ getAttribute: () => "meta-csrf" }), documentElement: { innerHTML: "" } };
+    expect(lireContexte(doc)).toEqual({
+      csrf: "abc-123",
+      anonId: "9a8b-c",
+      siid: "0f8c1e2a-1111-4222-8333-444455556666",
+    });
+    const meta = {
+      ...doc,
+      querySelector: () => ({ getAttribute: () => "meta-csrf" }),
+      documentElement: { innerHTML: "" },
+    };
     expect(lireContexte(meta as unknown as Document).csrf).toBe("meta-csrf");
   });
 });

@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     ia_factice: bool = False
     # Photos IA (Replicate)
     replicate_api_token: str = ""
+    # Telegram : un bot (token de @BotFather), un chat par compte Vinted. Vide = alertes en push seulement.
+    telegram_bot_token: str = ""
     # Notifications push (étape 4)
     vapid_public_key: str = ""
     vapid_private_key: str = ""

@@ -338,3 +338,64 @@ déployé. `main` n'a pas été touchée ; la branche vit dans un worktree sépa
    5 au total) et attendre au plus ~7 min : vérifier le brouillon sur Vinted (ordre des photos, première photo réelle,
    titre, description, prix, catégorie, marque, taille, état, couleur, déclaration IA).
 6. Vérifier qu'un article sans photo de dos est refusé (notification) et qu'un article de l'autre compte n'est pas pris.
+
+## Phase 2 : pilotage ✅
+
+### Fait
+- **File de tâches générique** (`tache_vinted`, `services/taches.py`, `services/file_vinted.py`) : types de la
+  spécification (+ `photos_reference` pour la phase 5), priorités 1 à 5, `executer_apres`, statuts `a_valider`
+  (attend Lucas), `a_faire`, `en_cours`, `faite`, `erreur`, `annulee`, clé d'unicité (jamais deux fois la même
+  action). Routes `GET /api/extension/taches/suivante`, `POST /api/extension/taches/{id}/resultat`,
+  `POST /api/extension/evenements`. Les brouillons passent par la file ; les routes de la phase 1 restent
+  (compatibilité des tests).
+- **Règles de distribution** : une tâche à la fois par compte ; la nuit, seules les réponses aux acheteurs (messages
+  et offres reçues) ; 20 à 60 s entre deux actions non urgentes ; un module coupé laisse ses tâches en file ;
+  tâche sans résultat après 20 min → erreur, jamais relancée.
+- **Budget d'actions** (réglable) : 40 republications, 60 offres, 120 messages, 6 brouillons par jour, 15 actions
+  par heure. Dépassement : action reportée à l'heure suivante ou au lendemain (étalée) ; les réponses aux acheteurs
+  ignorent le plafond horaire.
+- **Arrêts automatiques** : réponse inattendue (401, 403, 429, captcha, non JSON), 3 erreurs Vinted consécutives,
+  session expirée (avec la marche à suivre), budget journalier dépassé par une réponse → compte en pause, alerte,
+  reprise manuelle uniquement. **Arrêt d'urgence** : interrupteur global, modules par compte, pause par compte,
+  `/stop` sur Telegram.
+- **Telegram** (`services/telegram.py`) : `TELEGRAM_BOT_TOKEN`, relevé `getUpdates` toutes les 5 s (pas de
+  webhook), appairage par code à 6 chiffres (`/start <code>`), commandes `/stop`, `/reprendre`, `/etat`, boutons
+  Envoyer / Modifier / Ignorer sur les propositions de l'assistant. Alertes : arrêt, session expirée, mauvais compte,
+  hors ligne, brouillons prêts, erreurs, vente et litige (mails). Silencieuses la nuit. Sans token : rien n'est
+  envoyé, sans erreur. Les notifications push restent en place.
+- **Surveillance** : signal de vie chaque minute (avec « onglet Vinted ouvert ») ; sans signal pendant 5 min, ou
+  onglet fermé depuis 5 min → une alerte, puis « de nouveau en ligne » au retour.
+- **Réglages par compte** (JSON, valeurs par défaut de la spécification, validation des bornes) : heures actives,
+  modules, budget, brouillons, assistant, prix, favoris, republication, après-vente, types d'alertes.
+- **App** : Paramètres → Automatisation : interrupteur général, réglages par compte (panneau latéral), Telegram
+  (code d'appairage), budget du jour, actions en attente (valider, corriger, ignorer), journal.
+- **Extension** : boucle générique sur la file du backend (le backend décide du rythme), signal « onglet ouvert »,
+  exécuteurs par type, distinction erreur Vinted / contrôle de l'extension ; vérification Prettier ajoutée.
+
+### Tests
+- Backend : 22 nouveaux tests (`tests/test_pilotage.py`) avec un faux client Telegram : priorités, nuit,
+  interrupteurs, unicité, tâche perdue, 3 erreurs consécutives, arrêt sur réponse inattendue, plafonds horaire et
+  journalier, appairage, commandes, boutons, validation depuis l'app, absence de token, alertes silencieuses et
+  filtrées, vente relayée au bon chat, hors ligne, onglet fermé, réglages. 226 tests au total.
+- Extension : 37 tests (file générique, arrêt, pause, onglet fermé). Migration `d7b3f0a9c214` vérifiée.
+
+### Décisions prises (phase 2)
+- **Offres reçues la nuit** : traitées comme des réponses aux acheteurs (délai de 5 à 15 min), car l'assistant les
+  inclut dans le même délai de nuit. Les relances de favoris, elles, attendent 8 h.
+- **Plafond journalier atteint par une réponse à un acheteur** : arrêt du compte (120 messages ou 60 offres dans la
+  journée est anormal) plutôt que de laisser un acheteur sans réponse sans prévenir.
+- **Erreurs consécutives** : seules les erreurs renvoyées par Vinted comptent ; un refus d'un contrôle de l'extension
+  (taille introuvable, mauvais compte…) ne compte pas et n'interrompt pas la série.
+- **Chaque action commencée compte dans le budget**, réussie ou non.
+- **Écart de 20 à 60 s** entre deux actions non urgentes d'un même compte (en plus des délais propres à chaque
+  module) : jamais de rafale, même à 8 h quand la file de la nuit se vide.
+- **Brouillons** : la cadence (5 min + 0 à 120 s) est désormais gérée par le backend.
+- **Alertes Telegram la nuit** : envoyées sans son.
+- **Débrancher la boîte mail** d'un compte piloté garde le compte.
+
+### À tester toi-même (phase 2)
+1. Créer le bot avec @BotFather, mettre `TELEGRAM_BOT_TOKEN` dans `.env` (ou dans les variables Railway), redémarrer.
+2. Paramètres → Automatisation → « Relier Telegram » sur chaque compte, envoyer `/start <code>` au bot depuis le
+   téléphone de la personne concernée (ta sœur pour son compte).
+3. Envoyer `/etat`, puis `/stop` et vérifier que la popup de l'extension passe en pause ; `/reprendre`.
+4. Fermer Chrome 6 minutes : une alerte « hors ligne » doit arriver, puis « de nouveau en ligne » à la réouverture.

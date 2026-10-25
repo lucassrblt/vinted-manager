@@ -8,7 +8,7 @@ type Gestion = (payload: never) => Reponse;
 
 export class ContenuSimule {
   compte: Gestion = () => ({ ok: true, resultat: { id: 3201823662, login: "jeanmekloul" } });
-  brouillon: Gestion = () => ({ ok: false, erreur: "non prévu", arret: false, mauvais_compte: false });
+  executer: Gestion = () => ({ ok: false, erreur: "non prévu", arret: false, mauvais_compte: false });
   messages: VersContenu[] = [];
 
   repondre(m: VersContenu): Reponse {
@@ -19,7 +19,7 @@ export class ContenuSimule {
   }
 }
 
-export function environnement(o: { configure?: boolean; onglet?: number | null; aleatoire?: number } = {}) {
+export function environnement(o: { configure?: boolean; onglet?: number | null } = {}) {
   const backend = new FauxBackend();
   const contenu = new ContenuSimule();
   let horloge = Date.UTC(2026, 9, 25, 12, 0, 0);
@@ -38,7 +38,6 @@ export function environnement(o: { configure?: boolean; onglet?: number | null; 
     ongletVinted: async () => (o.onglet === undefined ? 7 : o.onglet),
     envoyer: async <R>(_onglet: number, m: VersContenu) => contenu.repondre(m) as Reponse<R>,
     maintenant: () => horloge,
-    aleatoire: () => o.aleatoire ?? 0.5,
     lireMemoire: async () => ({ ...memoire }),
     ecrireMemoire: async (m) => {
       memoire = { ...m };

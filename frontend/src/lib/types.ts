@@ -517,6 +517,28 @@ export interface CompteAutomatisation {
   pause_raison: string | null;
   brouillons_du_jour: number;
   brouillons_max_jour: number;
+  telegram_relie: boolean;
+  telegram_code: string | null;
+  telegram_code_expire_le: string | null;
+  budget_utilise: Record<"brouillons" | "messages" | "offres" | "republications" | "heure", number>;
+  budget_plafonds: Record<"brouillons" | "messages" | "offres" | "republications" | "heure", number>;
+  file: Partial<Record<"a_faire" | "a_valider" | "en_cours", number>>;
+}
+
+export interface TacheVinted {
+  id: number;
+  compte_id: number;
+  type: string;
+  article_id: number | null;
+  payload: Record<string, unknown>;
+  priorite: number;
+  executer_apres: string;
+  statut: "a_valider" | "a_faire" | "en_cours" | "faite" | "erreur" | "annulee";
+  resultat: Record<string, unknown> | null;
+  erreur: string | null;
+  created_at: string;
+  debut_le: string | null;
+  fin_le: string | null;
 }
 
 export interface EntreeJournal {

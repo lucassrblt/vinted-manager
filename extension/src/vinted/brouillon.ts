@@ -62,7 +62,13 @@ export async function envoyerPhotos(ids: number[], d: Dependances): Promise<Phot
   for (const [i, id] of ids.entries()) {
     if (i > 0) await d.attendre(entre(2000, 5000, d.aleatoire));
     const envoyee = await d.client.envoyerPhoto(await d.photo(id), session);
-    assignees.push({ id: envoyee.id, orientation: 0, ai_detected: false, digital_source_type: [], c2pa_read_error: "other" });
+    assignees.push({
+      id: envoyee.id,
+      orientation: 0,
+      ai_detected: false,
+      digital_source_type: [],
+      c2pa_read_error: "other",
+    });
     imageIds.push(envoyee.image_uuid);
   }
   return { session, assignees, imageIds };
@@ -86,7 +92,8 @@ export async function preparerObjet(annonce: Annonce, photos: PhotosEnvoyees, d:
   const { client } = d;
   const categories = await client.suggestionsCategories(photos.imageIds, photos.session);
   const catalogId = categories.prefill_categories?.[0];
-  if (!catalogId) throw new ErreurAction("Catégorie introuvable : Vinted n'a proposé aucune catégorie pour ces photos.");
+  if (!catalogId)
+    throw new ErreurAction("Catégorie introuvable : Vinted n'a proposé aucune catégorie pour ces photos.");
   const { attributes } = await client.attributs(catalogId);
   const tailleId = trouverTaille(attributes, annonce.taille);
   const etatId = verifierEtat(attributes, annonce.condition_id);

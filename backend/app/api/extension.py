@@ -3,14 +3,16 @@
 L'extension n'a que le minimum : elle exécute ce que le backend lui donne et remonte ce qu'elle voit.
 """
 
-from typing import Annotated
+from datetime import datetime
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Response
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 
 from app.api.deps import Db, get_parametres
-from app.models import Article, CompteVinted, PhotoArticle
-from app.services import alertes, brouillons, extension
+from app.models import Article, CompteVinted, PhotoArticle, TacheVinted
+from app.services import alertes, brouillons, extension, file_vinted, horaires, reglages
 
 router = APIRouter(prefix="/extension", tags=["extension"])
 
@@ -37,9 +39,16 @@ class CompteOut(BaseModel):
     pause_raison: str | None
     brouillons_du_jour: int
     brouillons_max_jour: int
+    # Réglages utiles à l'extension (relus à chaque cycle) : cadence de surveillance de Vinted.
+    automatisation_active: bool
+    heures_actives: bool
+    heure_debut: int
+    heure_fin: int
+    modules: dict[str, bool]
 
 
 def _compte_out(db: Db, compte: CompteVinted) -> CompteOut:
+    r = reglages.du_compte(compte)
     return CompteOut(
         compte_id=compte.id,
         nom=compte.nom,
@@ -48,6 +57,11 @@ def _compte_out(db: Db, compte: CompteVinted) -> CompteOut:
         pause_raison=compte.pause_raison,
         brouillons_du_jour=brouillons.brouillons_du_jour(db, compte),
         brouillons_max_jour=brouillons.max_par_jour(compte),
+        automatisation_active=get_parametres(db).automatisation_active,
+        heures_actives=horaires.actif(compte),
+        heure_debut=int(r["heures"]["debut"]),
+        heure_fin=int(r["heures"]["fin"]),
+        modules=dict(r["modules"]),
     )
 
 
@@ -60,11 +74,13 @@ class HeartbeatIn(BaseModel):
     vinted_user_id: int | None = None
     login: str | None = Field(default=None, max_length=120)
     version: str | None = Field(default=None, max_length=40)
+    # Un onglet www.vinted.fr est-il ouvert dans le profil ?
+    onglet: bool | None = None
 
 
 @router.post("/heartbeat", response_model=CompteOut)
 def heartbeat(data: HeartbeatIn, compte: Compte, db: Db) -> CompteOut:
-    extension.battement(db, compte, data.vinted_user_id, data.login, data.version)
+    extension.battement(db, compte, data.vinted_user_id, data.login, data.version, data.onglet)
     alertes.valider(db)
     return _compte_out(db, compte)
 
@@ -101,8 +117,76 @@ def reprendre(compte: Compte, db: Db) -> CompteOut:
 
 @router.get("/brouillons/suivant")
 def brouillon_suivant(compte: Compte, db: Db) -> object:
-    charge = brouillons.prochain(db, compte, get_parametres(db))
-    return charge if charge is not None else Response(status_code=204)
+    """Route de la phase 1, conservée : le brouillon passe désormais par la file de tâches."""
+    tache = file_vinted.suivante(db, compte, get_parametres(db), types={"brouillon"})
+    return tache.payload if tache is not None else Response(status_code=204)
+
+
+class TacheOut(BaseModel):
+    id: int
+    type: str
+    article_id: int | None
+    payload: dict[str, Any]
+    executer_apres: datetime
+
+
+@router.get("/taches/suivante", response_model=TacheOut)
+def tache_suivante(compte: Compte, db: Db) -> object:
+    tache = file_vinted.suivante(db, compte, get_parametres(db))
+    if tache is None:
+        return Response(status_code=204)
+    return TacheOut(
+        id=tache.id,
+        type=tache.type,
+        article_id=tache.article_id,
+        payload=tache.payload,
+        executer_apres=tache.executer_apres,
+    )
+
+
+class ResultatTacheIn(BaseModel):
+    ok: bool
+    resultat: dict[str, Any] | None = None
+    erreur: str | None = Field(default=None, max_length=2000)
+    # Réponse Vinted inattendue (401, 403, 429, captcha, non JSON) : le compte doit être arrêté.
+    arret: bool = False
+    # Échec renvoyé par Vinted (et non un contrôle préalable de l'extension).
+    erreur_vinted: bool = False
+
+
+def _terminer(db: Db, compte: CompteVinted, tache: TacheVinted, data: ResultatTacheIn) -> None:
+    if tache.statut != "en_cours":
+        raise HTTPException(409, "Cette tâche n'est pas en cours.")
+    file_vinted.terminer(
+        db, compte, tache, data.ok, data.resultat, data.erreur, data.arret, data.erreur_vinted
+    )
+    alertes.valider(db)
+
+
+@router.post("/taches/{tache_id}/resultat", status_code=204)
+def resultat_tache(tache_id: int, data: ResultatTacheIn, compte: Compte, db: Db) -> None:
+    tache = db.get(TacheVinted, tache_id)
+    if tache is None or tache.compte_id != compte.id:
+        raise HTTPException(404, "Tâche introuvable pour ce compte.")
+    if data.ok and tache.type == "brouillon" and not (data.resultat or {}).get("vinted_draft_id"):
+        raise HTTPException(422, "vinted_draft_id manquant.")
+    _terminer(db, compte, tache, data)
+
+
+class EvenementIn(BaseModel):
+    type: str = Field(min_length=1, max_length=40)
+    donnees: dict[str, Any] = Field(default_factory=dict)
+
+
+@router.post("/evenements")
+def evenement(data: EvenementIn, compte: Compte, db: Db) -> dict[str, Any]:
+    """Ce que l'extension observe sur Vinted. Le backend décide (règles, IA) et crée les tâches."""
+    traitement = file_vinted.EVENEMENTS.get(data.type)
+    if traitement is None:
+        raise HTTPException(422, f"Événement inconnu : {data.type}.")
+    reponse = traitement(db, compte, data.donnees)
+    alertes.valider(db)
+    return reponse
 
 
 def _article_du_compte(db: Db, compte: CompteVinted, article_id: int) -> Article:
@@ -137,14 +221,24 @@ class ResultatBrouillonIn(BaseModel):
 
 @router.post("/brouillons/{article_id}/resultat", status_code=204)
 def resultat_brouillon(article_id: int, data: ResultatBrouillonIn, compte: Compte, db: Db) -> None:
-    article = _article_du_compte(db, compte, article_id)
-    if article.brouillon_statut != "en_cours":
+    """Route de la phase 1, conservée : termine la tâche « brouillon » en cours de cet article."""
+    _article_du_compte(db, compte, article_id)
+    tache = db.scalar(
+        select(TacheVinted).where(
+            TacheVinted.compte_id == compte.id,
+            TacheVinted.article_id == article_id,
+            TacheVinted.type == "brouillon",
+            TacheVinted.statut == "en_cours",
+        )
+    )
+    if tache is None:
         raise HTTPException(409, "Ce brouillon n'est pas en cours.")
     if data.ok and data.vinted_draft_id is None:
         raise HTTPException(422, "vinted_draft_id manquant.")
-    brouillons.enregistrer_resultat(
-        db, compte, article, data.ok, data.vinted_draft_id, data.erreur, data.ai_photo
+    resultat = {"vinted_draft_id": data.vinted_draft_id, "ai_photo": data.ai_photo} if data.ok else None
+    _terminer(
+        db,
+        compte,
+        tache,
+        ResultatTacheIn(ok=data.ok, resultat=resultat, erreur=data.erreur, arret=data.arret),
     )
-    if data.arret:
-        alertes.arreter_compte(db, compte, data.erreur or "Réponse inattendue de Vinted.")
-    alertes.valider(db)

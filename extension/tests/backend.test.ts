@@ -13,7 +13,11 @@ describe("client du backend", () => {
   it("jeton refusé et backend injoignable : messages clairs", async () => {
     const refuse = new ClientBackend(async () => new Response("{}", { status: 401 }), "http://localhost:8000", "x");
     await expect(refuse.compte()).rejects.toThrow("Jeton d'extension refusé");
-    const absent = new ClientBackend(async () => Promise.reject(new TypeError("fetch failed")), "http://localhost:8000/", "x");
+    const absent = new ClientBackend(
+      async () => Promise.reject(new TypeError("fetch failed")),
+      "http://localhost:8000/",
+      "x",
+    );
     const err = await absent.compte().catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ErreurBackend);
     expect((err as Error).message).toContain("injoignable");

@@ -1,7 +1,6 @@
 """Phase 1 : socle de l'extension et brouillons automatiques (tests de réception 1 à 5)."""
 
 import io
-from datetime import timedelta
 from decimal import Decimal as D
 
 import pytest
@@ -48,7 +47,7 @@ def test_jeton_obligatoire_et_stocke_hashe(anonyme: TestClient, db: Session) -> 
     assert anonyme.get("/api/extension/compte").status_code == 401
     assert anonyme.get("/api/extension/compte", headers=entetes("vmx_faux")).status_code == 401
     r = anonyme.get("/api/extension/compte", headers=entetes(jeton))
-    assert r.json() == {
+    assert r.json() | {"heures_actives": None} == {
         "compte_id": compte.id,
         "nom": "Lucas",
         "vinted_user_id": LUCAS_VINTED,
@@ -56,6 +55,13 @@ def test_jeton_obligatoire_et_stocke_hashe(anonyme: TestClient, db: Session) -> 
         "pause_raison": None,
         "brouillons_du_jour": 0,
         "brouillons_max_jour": 6,
+        "automatisation_active": True,
+        "heures_actives": None,
+        "heure_debut": 8,
+        "heure_fin": 23,
+        "modules": dict.fromkeys(
+            ("brouillons", "assistant", "favoris", "republication", "prix", "apres_vente"), True
+        ),
     }
     assert compte.jeton_extension_hash != jeton and len(compte.jeton_extension_hash or "") == 64
 
@@ -206,11 +212,14 @@ def test_moins_de_5_photos_refuse(db: Session) -> None:
 # --- Test de réception 4 : quota de 6 brouillons par jour ------------------------------------
 
 
-def test_septieme_demande_du_jour_non_traitee(client: TestClient, db: Session, journee: None) -> None:
+def test_septieme_demande_du_jour_non_traitee(
+    client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
     compte, jeton = creer_compte(db, "Lucas", LUCAS_VINTED)
     for i in range(7):
         article_pret(db, compte, nom=f"T-shirt {i}")
     for i in range(6):
+        a_heure(monkeypatch, 9 + i)  # au plus un brouillon toutes les 5 min (+ 0 à 120 s)
         charge = _suivant(client, jeton)
         assert charge is not None, f"demande {i + 1}"
         client.post(
@@ -218,6 +227,7 @@ def test_septieme_demande_du_jour_non_traitee(client: TestClient, db: Session, j
             json={"ok": True, "vinted_draft_id": 1000 + i},
             headers=entetes(jeton),
         )
+    a_heure(monkeypatch, 16)
     assert _suivant(client, jeton) is None
     assert client.get("/api/automatisation/comptes").json()[0]["brouillons_du_jour"] == 6
 
@@ -236,7 +246,10 @@ def test_aucun_brouillon_la_nuit(client: TestClient, db: Session, monkeypatch: p
 # --- Test de réception 5 : réponse 403 → pause -----------------------------------------------
 
 
-def test_reponse_403_met_le_compte_en_pause(client: TestClient, db: Session, journee: None) -> None:
+def test_reponse_403_met_le_compte_en_pause(
+    client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    a_heure(monkeypatch, 14)
     compte, jeton = creer_compte(db, "Lucas", LUCAS_VINTED)
     a = article_pret(db, compte)
     article_pret(db, compte, nom="Autre")
@@ -253,6 +266,7 @@ def test_reponse_403_met_le_compte_en_pause(client: TestClient, db: Session, jou
     assert _alertes(db, "arret")
     assert _suivant(client, jeton) is None  # plus rien tant que Lucas n'a pas repris
     assert client.post(f"/api/automatisation/comptes/{compte.id}/reprendre").json()["pause"] is False
+    a_heure(monkeypatch, 14, 10)
     assert _suivant(client, jeton) is not None
 
 
@@ -264,13 +278,17 @@ def test_arret_signale_hors_tache(client: TestClient, db: Session) -> None:
     assert r.json()["pause"] is True
 
 
-def test_brouillon_reste_en_cours_trop_longtemps(client: TestClient, db: Session, journee: None) -> None:
+def test_brouillon_reste_en_cours_trop_longtemps(
+    client: TestClient, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
     compte, jeton = creer_compte(db, "Lucas", LUCAS_VINTED)
+    a_heure(monkeypatch, 14)
     a = article_pret(db, compte)
     article_pret(db, compte, nom="Suivant")
     assert _suivant(client, jeton) is not None
-    a.updated_at = a.updated_at - timedelta(hours=1)
-    db.commit()
+    a_heure(monkeypatch, 14, 30)
+    assert _suivant(client, jeton) is None  # la tâche interrompue passe en erreur, rien d'autre ce tour-ci
+    a_heure(monkeypatch, 14, 40)
     suivant = _suivant(client, jeton)
     db.refresh(a)
     assert a.brouillon_statut == "erreur" and "interrompu" in (a.brouillon_erreur or "")

@@ -93,6 +93,11 @@ class Parametres(Base):
     )
     # Brouillons automatiques : la photo « devant » publiée est l'originale (redressée, recadrée).
     premiere_photo_reelle: Mapped[bool] = mapped_column(default=True, server_default="true")
+    # Interrupteur global de l'automatisation Vinted (arrêt d'urgence de tous les comptes).
+    automatisation_active: Mapped[bool] = mapped_column(default=True, server_default="true")
+    # Telegram : dernier update lu (long polling) et réponses en cours de modification par chat.
+    telegram_offset: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")
+    telegram_attente: Mapped[dict[str, Any] | None] = mapped_column(JSON)
 
 
 class CompteVinted(TimestampMixin, Base):
@@ -125,6 +130,13 @@ class CompteVinted(TimestampMixin, Base):
     pause_raison: Mapped[str | None] = mapped_column(Text)
     # Réglages de l'automatisation (voir services/reglages.py pour les valeurs par défaut).
     reglages: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    # Appairage Telegram : code à 6 chiffres envoyé au bot avec /start.
+    telegram_code: Mapped[str | None] = mapped_column(String(6))
+    telegram_code_expire_le: Mapped[datetime | None]
+    # Surveillance : alertes « hors ligne » et « onglet fermé » déjà envoyées (une seule fois).
+    onglet_ferme_depuis: Mapped[datetime | None]
+    alerte_hors_ligne_le: Mapped[datetime | None]
+    alerte_onglet_le: Mapped[datetime | None]
 
     @property
     def imap_configure(self) -> bool:
@@ -145,3 +157,32 @@ class JournalVinted(Base):
     type: Mapped[str] = mapped_column(String(40))
     message: Mapped[str] = mapped_column(Text)
     article_id: Mapped[int | None] = mapped_column(ForeignKey("article.id", ondelete="SET NULL"))
+
+
+class TacheVinted(Base):
+    """Une action à exécuter sur Vinted par l'extension. Le backend décide, l'extension exécute.
+
+    Statuts : a_valider (attend Lucas, sur Telegram) | a_faire | en_cours | faite | erreur | annulee.
+    Une tâche en erreur n'est jamais relancée automatiquement.
+    """
+
+    __tablename__ = "tache_vinted"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    compte_id: Mapped[int] = mapped_column(ForeignKey("compte_vinted.id", ondelete="CASCADE"), index=True)
+    type: Mapped[str] = mapped_column(String(30))
+    article_id: Mapped[int | None] = mapped_column(ForeignKey("article.id", ondelete="SET NULL"), index=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    priorite: Mapped[int] = mapped_column(default=5)
+    executer_apres: Mapped[datetime] = mapped_column(default=utcnow, index=True)
+    statut: Mapped[str] = mapped_column(String(20), default="a_faire", index=True)
+    resultat: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    erreur: Mapped[str | None] = mapped_column(Text)
+    # Échec renvoyé par Vinted (et non un contrôle préalable) : compte pour les 3 erreurs consécutives.
+    erreur_vinted: Mapped[bool] = mapped_column(default=False, server_default="false")
+    tentatives: Mapped[int] = mapped_column(default=0)
+    # Empêche de créer deux fois la même action (ex. « offre:<id de la demande> »).
+    cle: Mapped[str | None] = mapped_column(String(120), index=True)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+    debut_le: Mapped[datetime | None]
+    fin_le: Mapped[datetime | None]

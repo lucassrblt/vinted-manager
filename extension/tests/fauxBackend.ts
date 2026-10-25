@@ -20,6 +20,11 @@ export const COMPTE: CompteBackend = {
   pause_raison: null,
   brouillons_du_jour: 0,
   brouillons_max_jour: 6,
+  automatisation_active: true,
+  heures_actives: true,
+  heure_debut: 8,
+  heure_fin: 23,
+  modules: { brouillons: true, assistant: true, favoris: true, republication: true, prix: true, apres_vente: true },
 };
 
 export class FauxBackend {
@@ -37,6 +42,8 @@ export class FauxBackend {
     this.sur("POST /pause", () => ({ body: (this.compte = { ...this.compte, pause: true }) }));
     this.sur("POST /reprendre", () => ({ body: (this.compte = { ...this.compte, pause: false }) }));
     this.sur("GET /brouillons/suivant", () => ({ status: 204 }));
+    this.sur("GET /taches/suivante", () => ({ status: 204 }));
+    this.sur("POST /taches/{n}/resultat", () => ({ status: 204 }));
   }
 
   sur(cle: string, g: Gestionnaire): this {
@@ -52,7 +59,9 @@ export class FauxBackend {
     this.appels.push({ methode, chemin, corps, jeton });
     const g =
       this.routes.get(`${methode} ${chemin}`) ??
-      [...this.routes.entries()].find(([k]) => new RegExp(`^${k.replace(/\{n\}/g, "\\d+")}$`).test(`${methode} ${chemin}`))?.[1];
+      [...this.routes.entries()].find(([k]) =>
+        new RegExp(`^${k.replace(/\{n\}/g, "\\d+")}$`).test(`${methode} ${chemin}`),
+      )?.[1];
     if (!g) return new Response(JSON.stringify({ detail: "inconnu" }), { status: 404 });
     const r = g(corps);
     if (r.status === 204) return new Response(null, { status: 204 });

@@ -50,7 +50,6 @@ async function tick(): Promise<void> {
       ongletVinted,
       envoyer,
       maintenant: () => Date.now(),
-      aleatoire: Math.random,
       lireMemoire: async () =>
         ((await chrome.storage.local.get("memoire")) as { memoire?: Memoire }).memoire ?? { ...MEMOIRE_INITIALE },
       ecrireMemoire: (memoire) => chrome.storage.local.set({ memoire }),
@@ -77,32 +76,35 @@ chrome.alarms.onAlarm.addListener((alarme) => {
   if (alarme.name === ALARME) void tick();
 });
 
-chrome.runtime.onMessage.addListener((message: VersFond | { type: "tick" | "pause" | "reprendre" }, _expediteur, repondre) => {
-  void (async () => {
-    if (message.type === "photo") {
-      const b = await backend();
-      if (!b) return repondre({ ok: false, erreur: "Extension non configurée.", arret: false, mauvais_compte: false });
-      try {
-        const octets = await b.photo(message.payload.photo_id);
-        repondre({ ok: true, resultat: { base64: blobVersBase64(octets) } } satisfies Reponse<PhotoBase64>);
-      } catch (e) {
-        repondre({ ok: false, erreur: (e as Error).message, arret: false, mauvais_compte: false });
+chrome.runtime.onMessage.addListener(
+  (message: VersFond | { type: "tick" | "pause" | "reprendre" }, _expediteur, repondre) => {
+    void (async () => {
+      if (message.type === "photo") {
+        const b = await backend();
+        if (!b)
+          return repondre({ ok: false, erreur: "Extension non configurée.", arret: false, mauvais_compte: false });
+        try {
+          const octets = await b.photo(message.payload.photo_id);
+          repondre({ ok: true, resultat: { base64: blobVersBase64(octets) } } satisfies Reponse<PhotoBase64>);
+        } catch (e) {
+          repondre({ ok: false, erreur: (e as Error).message, arret: false, mauvais_compte: false });
+        }
+        return;
       }
-      return;
-    }
-    if (message.type === "pause" || message.type === "reprendre") {
-      const b = await backend();
-      if (b) {
-        const compte = await b.pause(message.type === "pause");
-        await majEtat({ statut: compte.pause ? "pause" : "actif", message: compte.pause_raison });
+      if (message.type === "pause" || message.type === "reprendre") {
+        const b = await backend();
+        if (b) {
+          const compte = await b.pause(message.type === "pause");
+          await majEtat({ statut: compte.pause ? "pause" : "actif", message: compte.pause_raison });
+        }
+        repondre({ ok: true });
+        return;
       }
-      repondre({ ok: true });
-      return;
-    }
-    if (message.type === "tick") {
-      await tick();
-      repondre({ ok: true });
-    }
-  })();
-  return true; // réponse asynchrone
-});
+      if (message.type === "tick") {
+        await tick();
+        repondre({ ok: true });
+      }
+    })();
+    return true; // réponse asynchrone
+  },
+);

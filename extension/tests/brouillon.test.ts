@@ -26,7 +26,10 @@ function charge(modifs: Partial<ChargeBrouillon> = {}): ChargeBrouillon {
     categorie: "T-shirt",
     package_size_id: 1,
     ai_photo: false,
-    photos: [11, 12, 13, 14, 15].map((photo_id, i) => ({ photo_id, type: ["devant", "dos", "etiquette", "logo", "detail"][i]! })),
+    photos: [11, 12, 13, 14, 15].map((photo_id, i) => ({
+      photo_id,
+      type: ["devant", "dos", "etiquette", "logo", "detail"][i]!,
+    })),
     ...modifs,
   };
 }
@@ -73,7 +76,11 @@ describe("création d'un brouillon", () => {
     }
     const uploads = faux.appels.filter((a) => a.url.endsWith("/api/v2/photos"));
     expect(uploads).toHaveLength(5);
-    expect(uploads[0]?.corps).toEqual({ "photo[type]": "item", "photo[file]": "<fichier>", "photo[temp_uuid]": SESSION });
+    expect(uploads[0]?.corps).toEqual({
+      "photo[type]": "item",
+      "photo[file]": "<fichier>",
+      "photo[temp_uuid]": SESSION,
+    });
   });
 
   it("déclare ai_photo et les métadonnées de chaque photo", async () => {
@@ -110,7 +117,9 @@ describe("création d'un brouillon", () => {
 
   it("marque inconnue de Vinted : erreur, jamais une autre marque", async () => {
     const faux = fauxAvecPhotos();
-    const err = (await creerBrouillon(charge({ marque: "Marque Inventée" }), dependances(faux)).catch((e: unknown) => e)) as Error;
+    const err = (await creerBrouillon(charge({ marque: "Marque Inventée" }), dependances(faux)).catch(
+      (e: unknown) => e,
+    )) as Error;
     expect(err.message).toBe("Marque introuvable sur Vinted : « Marque Inventée ».");
     expect(faux.appels.some((a) => a.url.includes("/item_upload/brands?category_id=1806"))).toBe(true);
   });
@@ -149,7 +158,13 @@ describe("correspondances", () => {
   });
 
   it("marque : la fiche prime, la suggestion seulement si la fiche est vide", () => {
-    const suggestions = { brands: [{ id: 687713, title: "Nike ACG" }, { id: 53, title: "Nike" }], prefill_brand: { id: 687713, title: "Nike ACG" } };
+    const suggestions = {
+      brands: [
+        { id: 687713, title: "Nike ACG" },
+        { id: 53, title: "Nike" },
+      ],
+      prefill_brand: { id: 687713, title: "Nike ACG" },
+    };
     expect(choisirMarque("Nike", suggestions, null)).toEqual({ id: 53, title: "Nike" });
     expect(choisirMarque(null, suggestions, null)).toEqual({ id: 687713, title: "Nike ACG" });
     expect(choisirMarque("nike-acg", suggestions, null).id).toBe(687713);
@@ -157,7 +172,9 @@ describe("correspondances", () => {
   });
 
   it("couleurs : suggestion de Vinted, sinon la fiche", () => {
-    expect(choisirCouleurs("violet", { dynamic_attributes: [{ code: "color", suggested_option_ids: ["25"] }] }, couleurs)).toEqual([25]);
+    expect(
+      choisirCouleurs("violet", { dynamic_attributes: [{ code: "color", suggested_option_ids: ["25"] }] }, couleurs),
+    ).toEqual([25]);
     expect(couleursDeLaFiche("bleu marine", couleurs)).toEqual([27]);
     expect(couleursDeLaFiche("Gris chiné", couleurs)).toEqual([3]);
     expect(couleursDeLaFiche("violet", couleurs)).toEqual([6]);

@@ -14,7 +14,10 @@ void chrome.storage.local.get("config").then(({ config }) => {
 
 document.getElementById("formulaire")!.addEventListener("submit", async (e) => {
   e.preventDefault();
-  const config: Config = { backendUrl: (url.value.trim() || BACKEND_DEFAUT).replace(/\/+$/, ""), jeton: jeton.value.trim() };
+  const config: Config = {
+    backendUrl: (url.value.trim() || BACKEND_DEFAUT).replace(/\/+$/, ""),
+    jeton: jeton.value.trim(),
+  };
   let origine: string;
   try {
     origine = new URL(config.backendUrl).origin;

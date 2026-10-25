@@ -10,7 +10,7 @@ from app.db import SessionLocal, utcnow
 from app.logging import log
 from app.models import Envoi, Parametres, SyncLog
 from app.models.enums import StatutEnvoi
-from app.services import imap_idle, imap_sync, push
+from app.services import extension, imap_idle, imap_sync, push, telegram
 from app.services.auth import nettoyer_sessions
 from app.services.stats import jour_local
 
@@ -78,6 +78,24 @@ def tache_rappel_envois() -> None:
         )
 
 
+def tache_telegram() -> None:
+    """Relève les messages du bot (long polling court : pas de webhook à exposer)."""
+    try:
+        with SessionLocal() as db:
+            telegram.relever(db)
+    except Exception:
+        log.exception("telegram_erreur")
+
+
+def tache_surveillance() -> None:
+    """Extension silencieuse ou onglet Vinted fermé depuis 5 min : alerte."""
+    try:
+        with SessionLocal() as db:
+            extension.surveiller(db)
+    except Exception:
+        log.exception("surveillance_erreur")
+
+
 def tache_nettoyage() -> None:
     with SessionLocal() as db:
         nettoyer_sessions(db)
@@ -106,6 +124,11 @@ def demarrer() -> None:
         )
     planificateur.add_job(tache_rappel_envois, "cron", hour=9, minute=0, id="rappel_envois")
     planificateur.add_job(tache_nettoyage, "cron", hour=4, id="nettoyage")
+    planificateur.add_job(tache_surveillance, "interval", minutes=1, id="surveillance", coalesce=True)
+    if telegram.configure():
+        planificateur.add_job(
+            tache_telegram, "interval", seconds=5, id="telegram", max_instances=1, coalesce=True
+        )
     planificateur.start()
     log.info("planificateur_demarre")
 

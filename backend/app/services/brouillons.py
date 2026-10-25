@@ -12,13 +12,12 @@ from decimal import ROUND_CEILING, ROUND_HALF_UP, Decimal
 from typing import Any
 
 from PIL import Image
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db import utcnow
-from app.models import Article, CompteVinted, JournalVinted, Parametres, PhotoArticle
+from app.models import Article, CompteVinted, Parametres, PhotoArticle, TacheVinted
 from app.models.enums import EtatArticle, StatutArticle
-from app.services import alertes, couleur, horaires, images, photos, reglages, storage
+from app.services import alertes, couleur, horaires, images, photos, reglages, storage, taches
 from app.services.marques import normaliser
 
 # État vinted-manager → `condition_id` Vinted (options observées sur les catégories 1806 et 268).
@@ -32,8 +31,6 @@ CONDITION_IDS = {
 TYPES_EXIGES = ("devant", "dos", "etiquette")
 NB_PHOTOS_MIN = 5
 PART_PLANCHER = Decimal("0.82")
-# Un brouillon sans résultat après ce délai est considéré interrompu (jamais relancé automatiquement).
-DUREE_MAX_EN_COURS = timedelta(minutes=30)
 STATUTS_PHOTO_TERMINES = ("genere", "original")
 
 # Taille du colis : 1 pour les t-shirts et hauts légers (observé, catégorie 1806), 2 sinon
@@ -153,19 +150,14 @@ def photos_couleur_a_verifier(
 
 # --- Choix du prochain brouillon --------------------------------------------------------------
 
+# Au plus un brouillon toutes les 5 min, plus 0 à 120 s tirés au hasard.
+INTERVALLE = timedelta(minutes=5)
+ALEA_MAX_S = 120
+
 
 def brouillons_du_jour(db: Session, compte: CompteVinted) -> int:
-    """Brouillons demandés aujourd'hui (heure de Paris), réussis ou non : chaque essai agit sur Vinted."""
-    return (
-        db.scalar(
-            select(func.count(JournalVinted.id)).where(
-                JournalVinted.compte_id == compte.id,
-                JournalVinted.type == "brouillon_debut",
-                JournalVinted.date >= horaires.debut_du_jour(),
-            )
-        )
-        or 0
-    )
+    """Brouillons commencés aujourd'hui (heure de Paris), réussis ou non : chaque essai agit sur Vinted."""
+    return taches.utilisation(db, compte)["brouillons"]
 
 
 def max_par_jour(compte: CompteVinted) -> int:
@@ -177,26 +169,6 @@ def compte_pret(compte: CompteVinted) -> bool:
     if compte.pause or compte.vinted_user_id is None:
         return False
     return compte.vinted_user_id_vu is None or compte.vinted_user_id_vu == compte.vinted_user_id
-
-
-def _interrompre_brouillons_bloques(db: Session, compte: CompteVinted) -> bool:
-    """Marque en erreur les brouillons restés « en cours » trop longtemps. Renvoie True s'il en reste un
-    en cours (un seul brouillon à la fois par compte)."""
-    en_cours = db.scalars(
-        select(Article).where(Article.compte_id == compte.id, Article.brouillon_statut == "en_cours")
-    ).all()
-    reste = False
-    for a in en_cours:
-        if a.updated_at < utcnow() - DUREE_MAX_EN_COURS:
-            _echec(
-                db,
-                compte,
-                a,
-                "Brouillon interrompu (aucun résultat de l'extension). Vérifie les brouillons sur Vinted avant de relancer.",
-            )
-        else:
-            reste = True
-    return reste
 
 
 def _candidats(db: Session, compte: CompteVinted) -> list[Article]:
@@ -233,21 +205,25 @@ def verifier(db: Session, article: Article, params: Parametres) -> list[PhotoArt
     return liste
 
 
-def prochain(db: Session, compte: CompteVinted, params: Parametres) -> dict[str, Any] | None:
-    """Prochain article prêt pour ce compte, passé « en cours », ou None (quota, horaires, rien de prêt).
-    Le commit et l'envoi des alertes sont faits ici."""
-    resultat = _prochain(db, compte, params)
-    alertes.valider(db)
-    return resultat
-
-
-def _prochain(db: Session, compte: CompteVinted, params: Parametres) -> dict[str, Any] | None:
-    if not compte_pret(compte) or not reglages.module_actif(compte, "brouillons"):
-        return None
-    if not horaires.actif(compte) or _interrompre_brouillons_bloques(db, compte):
-        return None
+def peut_demarrer(db: Session, compte: CompteVinted) -> bool:
+    """Quota du jour et intervalle depuis le dernier brouillon."""
     if brouillons_du_jour(db, compte) >= max_par_jour(compte):
-        return None
+        return False
+    dernier = db.scalar(
+        select(TacheVinted)
+        .where(TacheVinted.compte_id == compte.id, TacheVinted.type == "brouillon")
+        .order_by(TacheVinted.created_at.desc(), TacheVinted.id.desc())
+        .limit(1)
+    )
+    if dernier is None:
+        return True
+    attente = INTERVALLE + timedelta(seconds=taches.alea(f"brouillon-{dernier.id}", 0, ALEA_MAX_S))
+    return horaires.maintenant() >= dernier.created_at + attente
+
+
+def choisir(db: Session, compte: CompteVinted, params: Parametres) -> TacheVinted | None:
+    """Crée la tâche du prochain brouillon (déjà « en cours ») pour l'article prêt le plus ancien.
+    Les articles incomplets passent en erreur, avec une alerte."""
     for article in _candidats(db, compte):
         liste = photos.photos_ordonnees(db, article.id)
         if not photos_terminees(liste):
@@ -277,7 +253,14 @@ def _prochain(db: Session, compte: CompteVinted, params: Parametres) -> dict[str
         alertes.journaliser(
             db, compte, "brouillon_debut", f"Brouillon demandé : {article.nom}", article_id=article.id
         )
-        return charge_utile(article, liste, params)
+        return taches.creer(
+            db,
+            compte,
+            "brouillon",
+            charge_utile(article, liste, params),
+            article_id=article.id,
+            statut="en_cours",
+        )
     return None
 
 
@@ -330,7 +313,7 @@ def enregistrer_resultat(
             raise ValueError("vinted_draft_id manquant")
         article.brouillon_statut, article.brouillon_erreur = "cree", None
         article.vinted_draft_id = vinted_draft_id
-        article.brouillon_cree_le = utcnow()
+        article.brouillon_cree_le = horaires.maintenant()
         article.ai_photo_declare = ai_photo_declare
         fixer_prix_initial(article, article.prix_vente_cible)
         alertes.journaliser(

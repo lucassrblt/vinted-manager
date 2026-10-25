@@ -114,7 +114,11 @@ export function choisirCouleurs(couleur: string | null, suggestions: Suggestions
 }
 
 /** Matière : suggestion de Vinted, sinon mots de la composition de la fiche (« 80 % coton »). */
-export function choisirMatieres(matiere: string | null, suggestions: SuggestionsAttributs, attributs: Attribut[]): number[] {
+export function choisirMatieres(
+  matiere: string | null,
+  suggestions: SuggestionsAttributs,
+  attributs: Attribut[],
+): number[] {
   const config = attribut(attributs, "material")?.configuration;
   if (!config) return [];
   const options = optionsAplaties(config.options);

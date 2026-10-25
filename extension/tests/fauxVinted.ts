@@ -69,7 +69,9 @@ export class FauxVinted {
     this.sur("PUT", /\/offer_requests\/\d+\/accept$/, () => r("offer_request_accept"));
     this.sur("PUT", /\/offer_requests\/\d+\/reject$/, () => r("offer_request_reject"));
     this.sur("GET", /^https:\/\/api\.vinted\.fr\/messaging\/main\/inbox$/, () => r("messaging_inbox"));
-    this.sur("GET", /^https:\/\/api\.vinted\.fr\/messaging\/main\/conversations\/[\w-]+$/, () => r("messaging_conversation"));
+    this.sur("GET", /^https:\/\/api\.vinted\.fr\/messaging\/main\/conversations\/[\w-]+$/, () =>
+      r("messaging_conversation"),
+    );
     this.sur("POST", /\/messaging\/main\/conversations\/[\w-]+\/replies$/, () => ({
       status: 201,
       body: capture("messaging_reply").response.body,
@@ -88,8 +90,17 @@ export class FauxVinted {
     const methode = (init.method ?? "GET").toUpperCase();
     let corps: unknown = null;
     if (typeof init.body === "string") corps = JSON.parse(init.body);
-    else if (init.body instanceof FormData) corps = Object.fromEntries([...init.body.entries()].map(([k, v]) => [k, typeof v === "string" ? v : "<fichier>"]));
-    this.appels.push({ methode, url, entetes: (init.headers ?? {}) as Record<string, string>, corps, credentials: init.credentials });
+    else if (init.body instanceof FormData)
+      corps = Object.fromEntries(
+        [...init.body.entries()].map(([k, v]) => [k, typeof v === "string" ? v : "<fichier>"]),
+      );
+    this.appels.push({
+      methode,
+      url,
+      entetes: (init.headers ?? {}) as Record<string, string>,
+      corps,
+      credentials: init.credentials,
+    });
     const route = this.routes.find((r) => r.methode === methode && r.motif.test(url));
     if (!route) throw new Error(`Requête non prévue dans le faux Vinted : ${methode} ${url}`);
     const rep = route.gestionnaire(url, corps);

@@ -205,9 +205,11 @@ export class ClientVinted {
       throw new ErreurVinted(`Vinted injoignable (${methode} ${chemin}).`, false);
     }
     const texte = await res.text();
-    if (res.status === 401) throw new ErreurVinted("Session Vinted expirée (401) : reconnecte-toi dans ce profil Chrome.", true, 401);
+    if (res.status === 401)
+      throw new ErreurVinted("Session Vinted expirée (401) : reconnecte-toi dans ce profil Chrome.", true, 401);
     if (res.status === 403) throw new ErreurVinted(`Vinted a refusé l'accès (403) sur ${chemin}.`, true, 403);
-    if (res.status === 429) throw new ErreurVinted(`Trop de requêtes : Vinted limite le débit (429) sur ${chemin}.`, true, 429);
+    if (res.status === 429)
+      throw new ErreurVinted(`Trop de requêtes : Vinted limite le débit (429) sur ${chemin}.`, true, 429);
     const minuscule = texte.slice(0, 5000).toLowerCase();
     let donnees: unknown;
     try {
@@ -232,7 +234,11 @@ export class ClientVinted {
       throw new ErreurVinted(`Vinted a refusé la demande (${res.status}) : ${messageDe(objet)}`, false, res.status);
     }
     if (typeof objet.code === "number" && objet.code !== 0) {
-      throw new ErreurVinted(`Vinted a refusé la demande (code ${objet.code}) : ${messageDe(objet)}`, false, res.status);
+      throw new ErreurVinted(
+        `Vinted a refusé la demande (code ${objet.code}) : ${messageDe(objet)}`,
+        false,
+        res.status,
+      );
     }
     return donnees as T;
   }
@@ -346,13 +352,19 @@ export class ClientVinted {
     });
   }
 
-  accepterOffre(transactionId: string | number, offerRequestId: string | number): Promise<{
+  accepterOffre(
+    transactionId: string | number,
+    offerRequestId: string | number,
+  ): Promise<{
     offer_request: { status: number };
   }> {
     return this.appeler("PUT", WWW, `/api/v2/transactions/${transactionId}/offer_requests/${offerRequestId}/accept`);
   }
 
-  refuserOffre(transactionId: string | number, offerRequestId: string | number): Promise<{
+  refuserOffre(
+    transactionId: string | number,
+    offerRequestId: string | number,
+  ): Promise<{
     offer_request: { status: number };
   }> {
     return this.appeler("PUT", WWW, `/api/v2/transactions/${transactionId}/offer_requests/${offerRequestId}/reject`);
