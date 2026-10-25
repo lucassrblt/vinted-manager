@@ -39,15 +39,9 @@ def login(data: LoginIn, request: Request, response: Response, db: Db) -> MoiOut
     ip = request.client.host if request.client else None
     try:
         user = auth.authentifier(db, data.email, data.mot_de_passe, ip)
-    except auth.CompteBloque as exc:
-        log.warning("login_bloque")
-        raise HTTPException(
-            429,
-            f"Trop de tentatives échouées. Réessaie dans {exc.minutes_restantes} minute(s).",
-        ) from exc
-    if user is None:
-        log.info("login_echec")
-        raise HTTPException(401, "Email ou mot de passe incorrect.")
+    except auth.EchecConnexion as exc:
+        log.info("login_echec", raison=str(exc))
+        raise HTTPException(401, str(exc)) from exc
     token = auth.creer_session(db, user, request.headers.get("user-agent"))
     _poser_cookie(response, token)
     log.info("login_ok")

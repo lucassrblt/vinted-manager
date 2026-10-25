@@ -23,6 +23,7 @@ from app.models import (
     Envoi,
     HistoriqueStatut,
     Message,
+    Parametres,
     PieceJointe,
     RegleClassement,
     Vente,
@@ -34,7 +35,7 @@ from app.models.enums import (
     StatutTraitementEmail,
     TypeEmail,
 )
-from app.services import classifieur, rapprochement, storage
+from app.services import classifieur, offres, rapprochement, stats, storage
 from app.services.email_parser import MailLu, PieceJointeBrute, liens_html, re_liens
 from app.services.marques import normaliser
 from app.services.notifications import annuler_en_attente, envoyer_en_attente, notifier
@@ -88,6 +89,9 @@ def enregistrer_mail(db: Session, mail: MailLu, compte_id: int | None = None) ->
     db.flush()
     if resultat.type:
         appliquer(db, email)
+    else:
+        # Filet de sécurité : un mail Vinted inconnu peut être une offre ou un message à ne pas rater.
+        notifier(db, "non_classe", "Mail Vinted non reconnu", "/mails", corps=email.sujet or "")
     db.commit()
     if email.date and email.date < utcnow() - timedelta(days=AGE_MAX_NOTIFICATION_JOURS):
         annuler_en_attente(db)  # relecture de l'historique : pas de notification pour les vieux mails
@@ -107,6 +111,7 @@ def appliquer(db: Session, email: EmailVinted, article: Article | None = None) -
         TypeEmail.ANNULATION: _annulation,
         TypeEmail.MESSAGE: _message,
         TypeEmail.OFFRE: _message,
+        TypeEmail.FAVORI: _favori,
     }
     action = actions.get(TypeEmail(email.type_detecte)) if email.type_detecte else None
     if action is None:
@@ -131,7 +136,12 @@ def _vente(db: Session, email: EmailVinted, article: Article | None) -> None:
         choix = rapprochement.choix_automatique(liste)
         if choix is None:
             email.statut_traitement = StatutTraitementEmail.NOUVEAU  # -> « Ventes à confirmer »
-            notifier(db, "vente", "Vente à confirmer", "/ventes", corps=d.get("titre_article") or "")
+            corps = " · ".join(
+                x
+                for x in (d.get("titre_article"), _prix_texte(_decimal(d.get("prix"))), d.get("acheteur"))
+                if x
+            )
+            notifier(db, "vente", "🛍️ Vente à confirmer", "/ventes", corps=corps)
             return
         article = db.get(Article, choix.article_id)
         assert article is not None
@@ -142,6 +152,10 @@ def _vente(db: Session, email: EmailVinted, article: Article | None) -> None:
 
 def _decimal(v: Any) -> Decimal | None:
     return Decimal(v) if isinstance(v, str) and v else None
+
+
+def _prix_texte(v: Decimal | None) -> str:
+    return offres.euros(v) if v is not None else ""
 
 
 def confirmer_vente(db: Session, email: EmailVinted, article: Article, auto: bool) -> Vente:
@@ -191,9 +205,8 @@ def _nouvelle_vente(db: Session, email: EmailVinted, article: Article, auto: boo
     email.statut_traitement = StatutTraitementEmail.TRAITE
     # Le mail de vente peut contenir directement le bordereau.
     _rattacher_bordereau(db, envoi, email)
-    notifier(
-        db, "vente", f"Vendu : {article.nom}", f"/stock/{article.id}", corps=f"{prix} €".replace(".", ",")
-    )
+    corps = _prix_texte(prix) + (f" · acheté par {vente.acheteur}" if vente.acheteur else "")
+    notifier(db, "vente", f"🛍️ Vendu : {article.nom}", f"/stock/{article.id}", corps=corps)
     return vente
 
 
@@ -699,14 +712,65 @@ def _message(db: Session, email: EmailVinted, article: Article | None) -> None:
         )
     elif article is not None:
         existant.article_id = article.id
+    nom = article.nom if article else d.get("titre_article") or ""
     if email.type_detecte == TypeEmail.OFFRE:
+        montant = _decimal(d.get("montant_offre"))
+        titre = (
+            "💰 Offre" + (f" de {_prix_texte(montant)}" if montant else "") + (f" sur {nom}" if nom else "")
+        )
+        affiche = _decimal(d.get("prix_affiche"))
+        corps = _detail_offre(db, article, montant, affiche, d.get("acheteur"))
+        notifier(db, "offre", titre, "/messages", corps=corps)
+    else:
+        titre = "💬 Message" + (f" de {d['acheteur']}" if d.get("acheteur") else "")
+        notifier(db, "message", titre, "/messages", corps=nom)
+    email.article_id = article.id if article else None
+    email.statut_traitement = StatutTraitementEmail.TRAITE
+
+
+DECISIONS = {"accepter": "accepter", "contre_proposer": "contre-proposer", "refuser": "refuser"}
+
+
+def _detail_offre(
+    db: Session,
+    article: Article | None,
+    montant: Decimal | None,
+    affiche: Decimal | None,
+    acheteur: str | None,
+) -> str:
+    """« Affiché 40 € (−13 %) · conseil : contre-proposer 38 € · sophie.b ». Le prix affiché vient
+    du mail (« au lieu de »), sinon de la fiche article."""
+    morceaux = []
+    params = db.get(Parametres, 1)
+    if affiche is None and article is not None:
+        affiche = stats.prix_vente(article)
+    if montant is not None and affiche:
+        ecart = round((montant - affiche) / affiche * 100)
+        morceaux.append(f"Affiché {_prix_texte(affiche)} ({ecart:+d} %)".replace("-", "−"))
+    if article is not None and montant is not None and params is not None:
+        analyse = offres.analyser(article, montant, params)
+        conseil = f"conseil : {DECISIONS[analyse.decision]}"
+        if analyse.montant_propose is not None:
+            conseil += f" {_prix_texte(analyse.montant_propose)}"
+        morceaux.append(conseil)
+    if acheteur:
+        morceaux.append(acheteur)
+    return " · ".join(morceaux)
+
+
+def _favori(db: Session, email: EmailVinted, article: Article | None) -> None:
+    d = email.donnees_extraites or {}
+    if article is None:
+        article = _article_par_titre(
+            db, d.get("titre_article"), [StatutArticle.EN_LIGNE], doublons_ok=True, compte_id=email.compte_id
+        )
+    if article is not None:
+        affiche = stats.prix_vente(article)
+        corps = article.nom + (f" · {_prix_texte(affiche)}" if affiche else "")
+        notifier(db, "favori", "❤️ Nouveau favori", f"/stock/{article.id}", corps=corps)
+    else:
         notifier(
-            db,
-            "offre",
-            "Nouvelle offre"
-            + (f" de {d['montant_offre']} €".replace(".", ",") if d.get("montant_offre") else ""),
-            "/messages",
-            corps=article.nom if article else "",
+            db, "favori", "❤️ Nouveau favori", "/mails", corps=d.get("titre_article") or email.sujet or ""
         )
     email.article_id = article.id if article else None
     email.statut_traitement = StatutTraitementEmail.TRAITE

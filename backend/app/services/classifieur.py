@@ -26,6 +26,7 @@ MOIS = {
 CHAMPS_EXTRACTION = (
     "prix",
     "montant_offre",
+    "prix_affiche",
     "titre_article",
     "numero_commande",
     "acheteur",
@@ -139,7 +140,7 @@ def extraire(regle: RegleLike, mail: MailLu) -> dict[str, Any]:
         # Groupe nommé « v » en priorité, sinon le premier groupe capturé, sinon tout le motif.
         captures = [g for g in (m.groupdict().get("v"), *m.groups()) if g]
         brut = (captures[0] if captures else m.group(0)).strip()
-        if champ in ("prix", "montant_offre"):
+        if champ in ("prix", "montant_offre", "prix_affiche"):
             valeur = montant(brut)
             if valeur is not None:
                 donnees[champ] = str(valeur)

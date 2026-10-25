@@ -93,6 +93,9 @@ class PreferencesNotifications(BaseModel):
     vente: bool = True
     litige: bool = True
     offre: bool = True
+    message: bool = True
+    favori: bool = True
+    non_classe: bool = True
     rappel_envois: bool = True
 
 

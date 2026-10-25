@@ -13,14 +13,14 @@ class Settings(BaseSettings):
     # Cookie Secure : désactivable en local (http://localhost).
     cookie_secure: bool = True
     session_days: int = 30
-    login_max_failures: int = 5
-    login_lock_minutes: int = 15
     fernet_key: str = ""
     max_upload_mb: int = 15
     timezone: str = "Europe/Paris"
     log_level: str = "INFO"
     # Tâches planifiées (synchro des mails toutes les 5 min). Désactivées dans les tests.
     scheduler_actif: bool = True
+    # Écoute IMAP IDLE : les mails sont lus dès leur arrivée (la synchro planifiée reste en secours).
+    ecoute_temps_reel: bool = True
     intervalle_synchro_minutes: int = 5
     # IA (étape 3). IA_FACTICE=true : réponses déterministes sans appel à l'API (démo, tests e2e).
     anthropic_api_key: str = ""

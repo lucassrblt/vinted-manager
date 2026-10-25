@@ -46,6 +46,7 @@ class TypeEmail(StrEnum):
     BORDEREAU = "bordereau"
     MESSAGE = "message"
     OFFRE = "offre"
+    FAVORI = "favori"
     EXPEDIE = "expedie"
     LIVRE = "livre"
     ARGENT_DISPONIBLE = "argent_disponible"

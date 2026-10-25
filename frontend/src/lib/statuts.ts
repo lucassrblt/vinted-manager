@@ -82,6 +82,7 @@ export const TYPES_EMAIL: Record<TypeEmail, string> = {
   bordereau: "Bordereau",
   message: "Message reçu",
   offre: "Offre reçue",
+  favori: "Mis en favori",
   expedie: "Colis expédié",
   livre: "Colis livré",
   argent_disponible: "Argent disponible",

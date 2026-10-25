@@ -4,7 +4,7 @@
 
 ### Fait
 - **Socle** : monorepo `backend/` (FastAPI, SQLAlchemy 2, Alembic, Postgres) + `frontend/` (Next.js 15, Tailwind 4, shadcn/ui), `docker-compose.yml`, `/health`.
-- **Auth** : utilisateur unique créé en CLI (`python -m app.cli create-user`), argon2, session en cookie httpOnly/SameSite=Lax de 30 jours renouvelée à l'usage, blocage 15 min après 5 échecs, redirection vers `/login`.
+- **Auth** : utilisateur unique créé en CLI (`python -m app.cli create-user`), argon2, session en cookie httpOnly/SameSite=Lax de 30 jours renouvelée à l'usage, redirection vers `/login`.
 - **Schéma complet** (toutes les tables des étapes 1 à 4) dans une migration initiale.
 - **Calculs métier** dans `backend/app/services/calculs.py` (marge, marge %, coefficient, indicateur, délai, sell-through) et répartition de la remise dans `remise.py`.
 - **Import Excel** avec aperçu corrigeable (rien n'est écrit avant validation), dont les onglets « Batch 2 », « Sourcing tests » et « Sourcing - Recherche ».
@@ -225,3 +225,26 @@ Les 4 étapes du cahier des charges sont faites. Ce qui reste à valider avec te
 2. **Bordereaux réels** : le format 10x15 met la page entière à l'échelle ; il faudra peut-être recadrer sur l'étiquette.
 3. **Notifications sur iPhone** : nécessitent l'URL HTTPS (Vercel) et l'app installée.
 4. **Qualité des textes de l'IA** : à juger sur tes articles, puis ajuster les prompts dans `backend/app/prompts/`.
+
+## Mise en ligne et notifications détaillées (ajout du 23/10/2026) ✅
+
+### Fait
+- **Production** : backend sur Railway (projet `vinted-manager` : service `backend`, Postgres, volume `/data`), front sur Vercel : https://vinted-manager-gamma.vercel.app (`vinted-manager.vercel.app` appartient à quelqu'un d'autre). Déploiement : `railway up ./backend --path-as-root --service backend` et `vercel deploy --prod` depuis `frontend/` (pas de déploiement automatique sur push).
+- **Notifications push détaillées** :
+  - offre : « 💰 Offre de 30 € sur <article> », avec prix affiché, écart en %, conseil (accepter, contre-proposer + montant, refuser) et pseudo ;
+  - message : « 💬 Message de <pseudo> » ;
+  - favori (nouveau type de mail) : « ❤️ Nouveau favori », article et prix ;
+  - vente : prix et acheteur ;
+  - filet de sécurité : un mail Vinted qu'aucune règle ne reconnaît envoie « Mail Vinted non reconnu » ;
+  - chaque type peut être coupé dans Paramètres → Notifications.
+- Règles par défaut en version 4 : la règle des favoris extrait le titre, l'offre « Commande mise à jour » extrait le pseudo.
+
+### À vérifier avec les vrais mails
+- Le format exact des mails de favori et de message n'a pas encore été vu : à contrôler après la première synchro en production.
+- **Connexion** : plus de blocage après plusieurs échecs (retiré le 23/10/2026). Les messages d'erreur disent précisément ce qui ne va pas : aucun compte créé, email inconnu (l'adresse saisie est rappelée) ou mot de passe incorrect, avec la commande à lancer pour corriger. Les tentatives restent journalisées.
+
+## Lecture des mails en temps réel (ajout du 23/10/2026) ✅
+
+- **Écoute IMAP IDLE** (`services/imap_idle.py`) : une connexion en lecture seule par boîte active ; Gmail prévient dès qu'un mail arrive et la synchro part aussitôt (notification en ~10 s). Connexion renouvelée toutes les 9 min, reconnexion automatique après une erreur (30 s → 5 min), écoutes vérifiées chaque minute (boîte ajoutée, modifiée, mise en pause). `ECOUTE_TEMPS_REEL=false` la coupe.
+- **Synchro planifiée toutes les minutes** en production (`INTERVALLE_SYNCHRO_MINUTES=1`), filet de sécurité si l'écoute tombe. Les mails déjà connus ne sont plus retéléchargés : seul leur en-tête Message-ID est relu.
+- **Journal de synchro** : nettoyé chaque nuit (7 derniers jours conservés).

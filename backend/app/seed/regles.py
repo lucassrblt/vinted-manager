@@ -17,11 +17,13 @@ from sqlalchemy.orm import Session
 
 from app.models import Parametres, RegleClassement
 
-VERSION_REGLES = 3
+VERSION_REGLES = 5
 
 EXPEDITEURS = ["vinted"]
 
 PRIX = r"(\d{1,4}(?:[.,]\d{1,2})?)\s?€"
+# Prix des offres, écrit « 12,00 € » ou « €12.00 » selon les mails.
+PRIX_OFFRE = r"(?:" + PRIX + r"|€\s?(\d{1,4}(?:[.,]\d{1,2})?))"
 TITRE = r"(?:article|annonce|commande)\s*(?:de\s*)?[«\"“]\s*(?P<v>[^»\"”\n]{2,120}?)\s*[»\"”]"
 TITRE_COMMANDE_MAJ = r"^Commande mise à jour pour (?P<v>.+?)\s*$"
 TITRE_VENTE = r"a acheté\s+(?P<v>[^\n]+?)\s+\d{1,4}(?:[.,]\d{1,2})?\s?€|" + TITRE.replace("(?P<v>", "(?P<x>")
@@ -30,6 +32,10 @@ TITRE_BORDEREAU = (
 )
 TITRE_FINALISEE = r"La vente de (?P<v>.+?) a été réalisée"
 TITRE_OFFRE = r"^Nouvelle offre pour (?P<v>.+?)\s*$|" + TITRE.replace("(?P<v>", "(?P<x>")
+TITRE_FAVORI = (
+    r"marqué (?:ton article |ton annonce )?[«\"“]?(?P<v>(?!ton article |ton annonce )[^»\"”\n]{2,120}?)[»\"”]? comme favori|"
+    + TITRE.replace("(?P<v>", "(?P<x>")
+)
 TITRE_MESSAGE = r"^Nouveau message à propos de (?:l'article )?(?P<v>.+?)\s*$|" + TITRE.replace(
     "(?P<v>", "(?P<x>"
 )
@@ -75,10 +81,10 @@ REGLES_INITIALES: list[dict] = [
     },
     {
         "nom": "Article mis en favori",
-        "type_cible": "autre",
+        "type_cible": "favori",
         "priorite": 2,
-        "conditions": {"expediteurs": EXPEDITEURS, "sujet_contient": ["marqué comme favori"]},
-        "extraction": {},
+        "conditions": {"expediteurs": EXPEDITEURS, "sujet_contient": ["comme favori"]},
+        "extraction": {"titre_article": TITRE_FAVORI, "acheteur": ACHETEUR},
     },
     # --- « Commande mise à jour pour <titre> » : une règle par étape ------------------------------
     {
@@ -173,7 +179,11 @@ REGLES_INITIALES: list[dict] = [
             "sujet_contient": COMMANDE_MAJ,
             "corps_contient": ["accepterais-tu de me vendre"],
         },
-        "extraction": {"titre_article": TITRE_COMMANDE_MAJ, "montant_offre": r"vendre ceci à\s*" + PRIX},
+        "extraction": {
+            "titre_article": TITRE_COMMANDE_MAJ,
+            "montant_offre": r"vendre ceci à\s*" + PRIX,
+            "acheteur": ACHETEUR,
+        },
     },
     {
         "nom": "Autre étape de commande",
@@ -237,7 +247,8 @@ REGLES_INITIALES: list[dict] = [
         "priorite": 60,
         "conditions": {"expediteurs": EXPEDITEURS, "sujet_contient": ["offre", "propose", "proposition"]},
         "extraction": {
-            "montant_offre": r"Nouvelle offre\s*:\s*" + PRIX + "|" + PRIX,
+            "montant_offre": r"Nouvelle offre\s*:\s*" + PRIX_OFFRE + "|" + PRIX_OFFRE,
+            "prix_affiche": r"au lieu de\s*" + PRIX_OFFRE,
             "titre_article": TITRE_OFFRE,
             "acheteur": ACHETEUR,
         },

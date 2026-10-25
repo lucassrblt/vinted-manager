@@ -38,8 +38,14 @@ class FauxImap:
         if commande == "SEARCH":
             return "OK", [b" ".join(str(i + 1).encode() for i in range(len(self.mails)))]
         if commande == "FETCH":
+            mail = self.mails[int(args[0]) - 1]
+            if args[1] == "(BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])":
+                entete = b"".join(
+                    ligne for ligne in mail.splitlines(True) if ligne.lower().startswith(b"message-id:")
+                )
+                return "OK", [(b"1 (BODY[HEADER.FIELDS (MESSAGE-ID)] {n}", entete + b"\r\n"), b")"]
             assert args[1] == "(BODY.PEEK[])", "les mails doivent être lus sans être marqués comme lus"
-            return "OK", [(b"1 (BODY[] {n}", self.mails[int(args[0]) - 1]), b")"]
+            return "OK", [(b"1 (BODY[] {n}", mail), b")"]
         raise AssertionError(f"Commande interdite : {commande}")
 
     def store(self, *a: Any) -> None:
@@ -74,11 +80,11 @@ def test_synchro_lecture_seule_et_dedoublonnage(db: Session, regles: None) -> No
     assert faux.readonly is True
     recherche = next(c for c in faux.commandes if c[0] == "SEARCH")
     assert 'OR FROM "vinted.fr" FROM "vinted.com"' in recherche[-1] and "SINCE" in recherche[-1]
-    # Deuxième passage : mêmes mails, rien de nouveau
-    [journal] = imap_sync.synchroniser(
-        db, get_parametres(db), lambda *_: FauxImap([ms.VENTE, ms.ARGENT, ms.INCONNU])
-    )
+    # Deuxième passage : mêmes mails, rien de nouveau, et seul l'en-tête Message-ID est relu
+    deuxieme = FauxImap([ms.VENTE, ms.ARGENT, ms.INCONNU])
+    [journal] = imap_sync.synchroniser(db, get_parametres(db), lambda *_: deuxieme)
     assert journal.nb_mails == 0
+    assert all(c[2] != "(BODY.PEEK[])" for c in deuxieme.commandes if c[0] == "FETCH")
     assert db.scalar(select(func.count(EmailVinted.id))) == 3
     assert set(db.scalars(select(EmailVinted.compte_id))) == {compte.id}
     db.refresh(compte)

@@ -12,6 +12,8 @@ import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, time, timedelta
+from email import policy
+from email.parser import BytesParser
 from typing import Any
 
 from sqlalchemy import func, select
@@ -19,7 +21,7 @@ from sqlalchemy.orm import Session
 
 from app.db import utcnow
 from app.logging import log
-from app.models import Article, CompteVinted, Parametres, SyncLog
+from app.models import Article, CompteVinted, EmailVinted, Parametres, SyncLog
 from app.services import crypto
 from app.services.email_parser import lire_mail
 from app.services.notifications import annuler_en_attente
@@ -43,6 +45,10 @@ class ErreurImap(Exception):
     pass
 
 
+class SynchroEnCours(ErreurImap):
+    pass
+
+
 @dataclass
 class ConfigImap:
     serveur: str
@@ -55,7 +61,7 @@ class ConfigImap:
 FabriqueClient = Callable[[str, int], Any]
 
 
-def _client_ssl(serveur: str, port: int) -> imaplib.IMAP4_SSL:
+def client_ssl(serveur: str, port: int) -> imaplib.IMAP4_SSL:
     return imaplib.IMAP4_SSL(serveur, port, timeout=TIMEOUT_SECONDES)
 
 
@@ -121,7 +127,7 @@ def _message_erreur(exc: Exception, cfg: ConfigImap) -> str:
     return f"Connexion impossible : {texte[:200]}"
 
 
-def _ouvrir(cfg: ConfigImap, fabrique: FabriqueClient) -> Any:
+def ouvrir(cfg: ConfigImap, fabrique: FabriqueClient) -> Any:
     try:
         client = fabrique(cfg.serveur, cfg.port)
         client.login(cfg.email, cfg.mot_de_passe)
@@ -137,19 +143,32 @@ def _dossier(nom: str) -> str:
     return f'"{nom}"' if " " in nom and not nom.startswith('"') else nom
 
 
-def tester_connexion(cfg: ConfigImap, fabrique: FabriqueClient = _client_ssl) -> int:
+def tester_connexion(cfg: ConfigImap, fabrique: FabriqueClient = client_ssl) -> int:
     """Se connecte et compte les mails du dossier. Lève ErreurImap avec un message clair."""
-    client = _ouvrir(cfg, fabrique)
+    client = ouvrir(cfg, fabrique)
     try:
         _, donnees = client.uid("SEARCH", None, "ALL")
         return len(donnees[0].split()) if donnees and donnees[0] else 0
     finally:
-        _fermer(client)
+        fermer(client)
 
 
-def _fermer(client: Any) -> None:
+def fermer(client: Any) -> None:
     with contextlib.suppress(Exception):  # la connexion est peut-être déjà coupée
         client.logout()
+
+
+def _deja_connu(db: Session, client: Any, uid: bytes) -> bool:
+    """Lit seulement l'en-tête Message-ID : un mail déjà enregistré n'est pas retéléchargé (pièces
+    jointes comprises), ce qui permet de synchroniser chaque minute sans surcharge."""
+    statut, contenu = client.uid("FETCH", uid, "(BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])")
+    entete = next((c[1] for c in contenu if isinstance(c, tuple) and len(c) > 1), None)
+    if statut != "OK" or not isinstance(entete, bytes):
+        return False
+    message_id = str(BytesParser(policy=policy.default).parsebytes(entete)["Message-ID"] or "").strip()
+    if not message_id:
+        return False  # identifiant calculé sur le contenu complet : il faut le télécharger
+    return db.scalar(select(EmailVinted.id).where(EmailVinted.message_id == message_id[:500])) is not None
 
 
 def date_imap(d: datetime) -> str:
@@ -167,10 +186,10 @@ def critere_expediteurs(expediteurs: list[str]) -> str:
     return critere
 
 
-def synchroniser(db: Session, params: Parametres, fabrique: FabriqueClient = _client_ssl) -> list[SyncLog]:
+def synchroniser(db: Session, params: Parametres, fabrique: FabriqueClient = client_ssl) -> list[SyncLog]:
     """Synchronise toutes les boîtes actives, l'une après l'autre (un journal par boîte)."""
     if not _verrou.acquire(blocking=False):
-        raise ErreurImap("Une synchronisation est déjà en cours.")
+        raise SynchroEnCours("Une synchronisation est déjà en cours.")
     try:
         comptes = comptes_actifs(db)
         if not comptes:
@@ -202,7 +221,7 @@ def _synchroniser_compte(
         depuis = (
             (compte.derniere_synchro - timedelta(days=1)) if compte.derniere_synchro else debut_historique(db)
         )
-        client = _ouvrir(cfg, fabrique)
+        client = ouvrir(cfg, fabrique)
         erreurs: list[str] = []
         try:
             criteres = (
@@ -214,6 +233,8 @@ def _synchroniser_compte(
             uids = donnees[0].split() if donnees and donnees[0] else []
             for uid in uids:
                 try:
+                    if _deja_connu(db, client, uid):
+                        continue
                     statut, contenu = client.uid("FETCH", uid, "(BODY.PEEK[])")
                     brut = next((c[1] for c in contenu if isinstance(c, tuple) and len(c) > 1), None)
                     if statut != "OK" or not isinstance(brut, bytes):
@@ -228,7 +249,7 @@ def _synchroniser_compte(
                         "sync_mail_erreur", uid=uid.decode(errors="ignore"), erreur=type(exc).__name__
                     )
         finally:
-            _fermer(client)
+            fermer(client)
         compte.derniere_synchro = journal.debut
         erreur = "\n".join(erreurs[:20]) or None
     except (ErreurImap, crypto.CleManquante) as exc:

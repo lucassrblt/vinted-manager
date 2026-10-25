@@ -78,7 +78,7 @@ def test_vente_detectee_notifie_apres_commit(db: Session, regles: None, envois: 
     db.commit()
     enregistrer_mail(db, lire_mail(ms.VENTE))
     assert [json.loads(e["data"])["titre"] for e in envois] == [
-        "Vendu : Pull demi-zip polaire Ralph Lauren - Noir"
+        "🛍️ Vendu : Pull demi-zip polaire Ralph Lauren - Noir"
     ]
     enregistrer_mail(db, lire_mail(ms.LITIGE))
     assert json.loads(envois[-1]["data"])["titre"] == "Nouveau litige"
@@ -108,10 +108,105 @@ def test_preferences_desactivent_un_type(
     db.add(AbonnementPush(endpoint=ABONNEMENT["endpoint"], p256dh="x" * 20, auth="y" * 10))
     db.commit()
     prefs = client.get("/api/parametres/notifications").json()
-    assert prefs == {"vente": True, "litige": True, "offre": True, "rappel_envois": True}
+    assert prefs == {
+        "vente": True,
+        "litige": True,
+        "offre": True,
+        "message": True,
+        "favori": True,
+        "non_classe": True,
+        "rappel_envois": True,
+    }
     client.put("/api/parametres/notifications", json=prefs | {"offre": False})
     enregistrer_mail(db, lire_mail(ms.OFFRE))
     assert envois == []
+
+
+def _abonne(db: Session) -> None:
+    db.add(AbonnementPush(endpoint=ABONNEMENT["endpoint"], p256dh="x" * 20, auth="y" * 10))
+    db.commit()
+
+
+def _derniere(envois: list[dict[str, Any]]) -> dict[str, Any]:
+    return json.loads(envois[-1]["data"])
+
+
+def test_offre_detaillee(db: Session, regles: None, envois: list[dict[str, Any]]) -> None:
+    _abonne(db)
+    db.add(
+        Article(
+            nom="Pull demi-zip polaire Ralph Lauren - Tibet",
+            prix_achat_net=D("10"),
+            prix_vente_cible=D("40"),
+            statut="en_ligne",
+        )
+    )
+    db.commit()
+    enregistrer_mail(db, lire_mail(ms.OFFRE))
+    notif = _derniere(envois)
+    assert notif["titre"] == "💰 Offre de 35 € sur Pull demi-zip polaire Ralph Lauren - Tibet"
+    assert notif["corps"].startswith("Affiché 40 € (−12 %) · conseil : ")
+    assert notif["url"] == "/messages"
+
+
+def test_offre_reelle_dans_commande(db: Session, regles: None, envois: list[dict[str, Any]]) -> None:
+    _abonne(db)
+    titre = "Sweat demi-zip Polo Ralph Lauren gris chiné taille M"
+    db.add(Article(nom=titre, prix_achat_net=D("15"), prix_vente_cible=D("45"), statut="en_ligne"))
+    db.commit()
+    offre = ms.mail(
+        f"Commande mise à jour pour {titre}",
+        "Bonjour vendeur,\nlea_92 te propose d'acheter ton article.\n"
+        "Bonjour, accepterais-tu de me vendre ceci à 30,00 € ?\n",
+    )
+    enregistrer_mail(db, lire_mail(offre))
+    notif = _derniere(envois)
+    assert notif["titre"] == f"💰 Offre de 30 € sur {titre}"
+    assert "Affiché 45 € (−33 %)" in notif["corps"] and notif["corps"].endswith("lea_92")
+
+
+def test_offre_reelle_prix_en_tete(db: Session, regles: None, envois: list[dict[str, Any]]) -> None:
+    """Format réel du 22/10/2026 : « €12.00 au lieu de €18.00 », article absent du stock."""
+    _abonne(db)
+    offre = ms.mail(
+        "Nouvelle offre pour Sweat à capuche adidas gris chiné taille L",
+        "vendeur,\nsilvigarbin te propose d'acheter Sweat à capuche adidas gris chiné taille L à un prix "
+        "plus bas.\n€12.00\nNouvelle offre :\n€12.00 au lieu de €18.00\nRépondre à l'offre\n",
+    )
+    enregistrer_mail(db, lire_mail(offre))
+    assert _derniere(envois) == {
+        "titre": "💰 Offre de 12 € sur Sweat à capuche adidas gris chiné taille L",
+        "corps": "Affiché 18 € (−33 %) · silvigarbin",
+        "url": "/messages",
+    }
+
+
+def test_message_et_favori_notifient(db: Session, regles: None, envois: list[dict[str, Any]]) -> None:
+    _abonne(db)
+    bonnet = Article(nom="Bonnet Ralph Lauren - Blanc", prix_vente_cible=D("16"), statut="en_ligne")
+    db.add(bonnet)
+    db.commit()
+    enregistrer_mail(db, lire_mail(ms.MESSAGE))
+    assert _derniere(envois)["titre"] == "💬 Message de tom_r"
+    assert _derniere(envois)["corps"] == "Bonnet Ralph Lauren - Blanc"
+    favori = ms.mail(
+        "Quelqu'un a marqué ton article comme favori",
+        "nina_33 a marqué ton article « Bonnet Ralph Lauren - Blanc » comme favori.",
+    )
+    email = enregistrer_mail(db, lire_mail(favori))
+    assert email is not None and email.type_detecte == "favori" and email.article_id == bonnet.id
+    assert _derniere(envois) == {
+        "titre": "❤️ Nouveau favori",
+        "corps": "Bonnet Ralph Lauren - Blanc · 16 €",
+        "url": f"/stock/{bonnet.id}",
+    }
+
+
+def test_mail_vinted_non_reconnu_notifie(db: Session, regles: None, envois: list[dict[str, Any]]) -> None:
+    _abonne(db)
+    enregistrer_mail(db, lire_mail(ms.INCONNU))
+    assert _derniere(envois)["titre"] == "Mail Vinted non reconnu"
+    assert _derniere(envois)["corps"] == "Les tendances de la semaine"
 
 
 def test_abonnement_expire_supprime(

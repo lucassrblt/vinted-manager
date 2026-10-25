@@ -27,6 +27,7 @@ export type BrouillonRegle = Omit<Regle, "id" | "created_at"> & { id?: number };
 const CHAMPS_EXTRACTION: { cle: keyof DonneesExtraites; libelle: string }[] = [
   { cle: "prix", libelle: "Prix de vente" },
   { cle: "montant_offre", libelle: "Montant de l'offre" },
+  { cle: "prix_affiche", libelle: "Prix affiché (offre)" },
   { cle: "titre_article", libelle: "Titre de l'article" },
   { cle: "numero_commande", libelle: "Numéro de commande" },
   { cle: "acheteur", libelle: "Pseudo de l'acheteur" },

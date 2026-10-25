@@ -29,7 +29,7 @@ class AnalyseOffre:
     explication: str
 
 
-def _euros(v: Decimal) -> str:
+def euros(v: Decimal) -> str:
     return f"{v:.2f}".replace(".", ",").replace(",00", "") + " €"
 
 
@@ -62,13 +62,13 @@ def analyser(article: Article, montant: Decimal, params: Parametres) -> AnalyseO
         )
     if montant >= mini and (affiche is None or montant >= affiche * SEUIL_ACCEPTATION):
         return resultat(
-            "accepter", None, f"L'offre respecte la marge minimale ({_euros(marge or Decimal(0))} de marge)."
+            "accepter", None, f"L'offre respecte la marge minimale ({euros(marge or Decimal(0))} de marge)."
         )
     if montant < mini * SEUIL_REFUS:
         return resultat(
             "refuser",
             None,
-            f"Offre trop basse : le minimum pour garder un coefficient de {calculs.nombre_fr(params.coefficient_min)} est {_euros(mini)}.",
+            f"Offre trop basse : le minimum pour garder un coefficient de {calculs.nombre_fr(params.coefficient_min)} est {euros(mini)}.",
         )
     # Contre-proposition : à mi-chemin entre l'offre et le prix affiché, jamais sous le plancher.
     milieu = ((montant + (affiche or mini)) / 2).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
@@ -78,5 +78,5 @@ def analyser(article: Article, montant: Decimal, params: Parametres) -> AnalyseO
     return resultat(
         "contre_proposer",
         propose,
-        f"Contre-proposition à {_euros(propose)} (minimum {_euros(mini)} pour un coefficient de {calculs.nombre_fr(params.coefficient_min)}).",
+        f"Contre-proposition à {euros(propose)} (minimum {euros(mini)} pour un coefficient de {calculs.nombre_fr(params.coefficient_min)}).",
     )

@@ -265,6 +265,7 @@ export type TypeEmail =
   | "bordereau"
   | "message"
   | "offre"
+  | "favori"
   | "expedie"
   | "livre"
   | "argent_disponible"
@@ -279,6 +280,7 @@ export type StatutEnvoi = "a_imprimer" | "imprime" | "depose" | "livre";
 export interface DonneesExtraites {
   prix?: string;
   montant_offre?: string;
+  prix_affiche?: string;
   titre_article?: string;
   numero_commande?: string;
   acheteur?: string;

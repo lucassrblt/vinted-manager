@@ -25,12 +25,26 @@ interface Appareil {
   user_agent: string | null;
   created_at: string;
 }
-type Preferences = Record<"vente" | "litige" | "offre" | "rappel_envois", boolean>;
+type Preferences = Record<
+  "vente" | "litige" | "offre" | "message" | "favori" | "non_classe" | "rappel_envois",
+  boolean
+>;
 
 const TYPES: { cle: keyof Preferences; libelle: string; aide: string }[] = [
   { cle: "vente", libelle: "Nouvelle vente détectée", aide: "Dès qu'un mail de vente Vinted arrive." },
   { cle: "litige", libelle: "Nouveau litige", aide: "Un acheteur a signalé un problème." },
-  { cle: "offre", libelle: "Nouvelle offre", aide: "Une offre a été reçue sur un article." },
+  {
+    cle: "offre",
+    libelle: "Nouvelle offre",
+    aide: "Montant, prix affiché et conseil (accepter, contre-proposer ou refuser).",
+  },
+  { cle: "message", libelle: "Nouveau message", aide: "Un membre t'a écrit à propos d'un article." },
+  { cle: "favori", libelle: "Article mis en favori", aide: "Quelqu'un a ajouté un de tes articles à ses favoris." },
+  {
+    cle: "non_classe",
+    libelle: "Mail Vinted non reconnu",
+    aide: "Un mail Vinted qu'aucune règle ne reconnaît : à vérifier pour ne rien rater.",
+  },
   { cle: "rappel_envois", libelle: "Rappel de 9 h", aide: "Les colis à déposer dans la journée et ceux en retard." },
 ];
 

@@ -1,4 +1,4 @@
-"""Authentification mono-utilisateur : argon2, sessions en base, anti-bruteforce."""
+"""Authentification mono-utilisateur : argon2, sessions en base, journal des tentatives."""
 
 import hashlib
 import secrets
@@ -17,9 +17,8 @@ _hasher = PasswordHasher()
 COOKIE_SESSION = "vm_session"
 
 
-class CompteBloque(Exception):
-    def __init__(self, minutes_restantes: int) -> None:
-        self.minutes_restantes = minutes_restantes
+class EchecConnexion(Exception):
+    """Connexion refusée ; le message est affiché tel quel sur la page de connexion."""
 
 
 def hasher_mot_de_passe(mot_de_passe: str) -> str:
@@ -30,33 +29,10 @@ def _hash_token(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-def _verifier_blocage(db: Session, email: str) -> None:
-    s = get_settings()
-    duree = timedelta(minutes=s.login_lock_minutes)
-    echecs = db.scalars(
-        select(TentativeConnexion.date)
-        .where(
-            TentativeConnexion.email == email,
-            TentativeConnexion.succes.is_(False),
-            TentativeConnexion.date >= utcnow() - 2 * duree,
-        )
-        .order_by(TentativeConnexion.date.desc())
-    ).all()
-    if not echecs:
-        return
-    # Les tentatives pendant le blocage ne sont pas enregistrées : le dernier échec est
-    # celui qui a déclenché le blocage, qui dure `duree` à partir de lui.
-    dernier = echecs[0]
-    recents = [d for d in echecs if d >= dernier - duree]
-    fin_blocage = dernier + duree
-    if len(recents) >= s.login_max_failures and utcnow() < fin_blocage:
-        restant = fin_blocage - utcnow()
-        raise CompteBloque(int(restant.total_seconds() // 60) + 1)
-
-
-def authentifier(db: Session, email: str, mot_de_passe: str, ip: str | None) -> Utilisateur | None:
+def authentifier(db: Session, email: str, mot_de_passe: str, ip: str | None) -> Utilisateur:
+    """Renvoie l'utilisateur, ou lève EchecConnexion avec la raison précise (application personnelle
+    mono-utilisateur : on préfère un message clair à la discrétion sur l'existence du compte)."""
     email = email.strip().lower()
-    _verifier_blocage(db, email)
     user = db.scalar(select(Utilisateur).where(Utilisateur.email == email))
     ok = False
     if user is not None:
@@ -64,18 +40,15 @@ def authentifier(db: Session, email: str, mot_de_passe: str, ip: str | None) -> 
             ok = _hasher.verify(user.mot_de_passe_hash, mot_de_passe)
         except (VerifyMismatchError, InvalidHashError):
             ok = False
-    else:
-        # Temps de réponse comparable que l'email existe ou non.
-        _hasher.hash(mot_de_passe)
     db.add(TentativeConnexion(email=email, ip=ip, succes=ok))
-    if ok:
-        db.execute(
-            delete(TentativeConnexion).where(
-                TentativeConnexion.email == email, TentativeConnexion.succes.is_(False)
-            )
-        )
     db.commit()
-    return user if ok else None
+    if user is None:
+        if nb_utilisateurs(db) == 0:
+            raise EchecConnexion("Aucun compte n'existe encore. Crée-le avec : python -m app.cli create-user")
+        raise EchecConnexion(f"Aucun compte avec l'email « {email} ». Vérifie l'adresse saisie.")
+    if not ok:
+        raise EchecConnexion("Mot de passe incorrect. Pour le changer : python -m app.cli reset-password")
+    return user
 
 
 def creer_session(db: Session, user: Utilisateur, user_agent: str | None) -> str:

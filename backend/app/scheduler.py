@@ -1,14 +1,16 @@
 """Tâches planifiées, dans le process de l'API (une seule instance en production)."""
 
+from datetime import timedelta
+
 from apscheduler.schedulers.background import BackgroundScheduler
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from app.config import get_settings
 from app.db import SessionLocal, utcnow
 from app.logging import log
-from app.models import Envoi, Parametres
+from app.models import Envoi, Parametres, SyncLog
 from app.models.enums import StatutEnvoi
-from app.services import imap_sync, push
+from app.services import imap_idle, imap_sync, push
 from app.services.auth import nettoyer_sessions
 from app.services.stats import jour_local
 
@@ -26,6 +28,30 @@ def tache_synchro() -> None:
             log.info("sync_ignoree", raison=str(exc))
         except Exception:
             log.exception("sync_erreur")
+
+
+def synchro_sur_nouveau_mail() -> bool:
+    """Appelée par l'écoute temps réel. False si une synchro est déjà en cours (à réessayer)."""
+    with SessionLocal() as db:
+        params = db.get(Parametres, 1)
+        if params is None:
+            return True
+        try:
+            imap_sync.synchroniser(db, params)
+        except imap_sync.SynchroEnCours:
+            return False
+        except imap_sync.ErreurImap as exc:
+            log.info("sync_ignoree", raison=str(exc))
+        except Exception:
+            log.exception("sync_erreur")
+    return True
+
+
+def tache_ecoute() -> None:
+    try:
+        imap_idle.surveiller(synchro_sur_nouveau_mail)
+    except Exception:
+        log.exception("ecoute_surveillance_erreur")
 
 
 def tache_rappel_envois() -> None:
@@ -55,6 +81,9 @@ def tache_rappel_envois() -> None:
 def tache_nettoyage() -> None:
     with SessionLocal() as db:
         nettoyer_sessions(db)
+        # Une synchro par minute : on ne garde que la dernière semaine du journal.
+        db.execute(delete(SyncLog).where(SyncLog.debut < utcnow() - timedelta(days=7)))
+        db.commit()
 
 
 def demarrer() -> None:
@@ -71,6 +100,10 @@ def demarrer() -> None:
         max_instances=1,
         coalesce=True,
     )
+    if s.ecoute_temps_reel:
+        planificateur.add_job(
+            tache_ecoute, "interval", minutes=1, id="ecoute", next_run_time=utcnow(), max_instances=1
+        )
     planificateur.add_job(tache_rappel_envois, "cron", hour=9, minute=0, id="rappel_envois")
     planificateur.add_job(tache_nettoyage, "cron", hour=4, id="nettoyage")
     planificateur.start()
@@ -82,3 +115,4 @@ def arreter() -> None:
     if planificateur is not None:
         planificateur.shutdown(wait=False)
         planificateur = None
+    imap_idle.arreter_tout()

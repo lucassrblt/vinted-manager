@@ -33,30 +33,29 @@ def test_login_cookie(anonyme: TestClient, db: Session) -> None:
     assert session is not None and session.token_hash != anonyme.cookies.get(COOKIE_SESSION)
 
 
-def test_mauvais_mot_de_passe(anonyme: TestClient, db: Session) -> None:
-    _creer_user(db)
-    r = anonyme.post("/api/auth/login", json={"email": EMAIL, "mot_de_passe": "faux"})
-    assert r.status_code == 401
-    assert r.json()["detail"] == "Email ou mot de passe incorrect."
+def test_messages_d_echec_precis(anonyme: TestClient, db: Session) -> None:
+    def login(email: str, mdp: str) -> tuple[int, str]:
+        r = anonyme.post("/api/auth/login", json={"email": email, "mot_de_passe": mdp})
+        return r.status_code, r.json()["detail"]
 
-
-def test_blocage_apres_5_echecs(anonyme: TestClient, db: Session) -> None:
-    _creer_user(db)
-    for _ in range(5):
-        assert anonyme.post("/api/auth/login", json={"email": EMAIL, "mot_de_passe": "x"}).status_code == 401
-    # Même le bon mot de passe est refusé pendant le blocage
-    r = anonyme.post("/api/auth/login", json={"email": EMAIL, "mot_de_passe": MOT_DE_PASSE})
-    assert r.status_code == 429
-    assert "15 minute" in r.json()["detail"]
-
-    # 15 minutes plus tard, c'est débloqué
-    for t in db.scalars(select(TentativeConnexion)):
-        t.date = t.date - timedelta(minutes=16)
-    db.commit()
-    assert (
-        anonyme.post("/api/auth/login", json={"email": EMAIL, "mot_de_passe": MOT_DE_PASSE}).status_code
-        == 200
+    assert login(EMAIL, "x") == (
+        401,
+        "Aucun compte n'existe encore. Crée-le avec : python -m app.cli create-user",
     )
+    _creer_user(db)
+    statut, detail = login("autre@example.com", "x")
+    assert statut == 401 and "« autre@example.com »" in detail
+    statut, detail = login(EMAIL, "faux")
+    assert statut == 401 and detail.startswith("Mot de passe incorrect.")
+
+
+def test_pas_de_blocage_apres_des_echecs(anonyme: TestClient, db: Session) -> None:
+    _creer_user(db)
+    for _ in range(10):
+        assert anonyme.post("/api/auth/login", json={"email": EMAIL, "mot_de_passe": "x"}).status_code == 401
+    r = anonyme.post("/api/auth/login", json={"email": EMAIL, "mot_de_passe": MOT_DE_PASSE})
+    assert r.status_code == 200
+    assert len(db.scalars(select(TentativeConnexion)).all()) == 11
 
 
 def test_session_expiree(client: TestClient, db: Session) -> None:
