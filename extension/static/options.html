@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>vinted-manager : options</title>
+    <link rel="stylesheet" href="style.css" />
+    <style>main { max-width: 480px; }</style>
+  </head>
+  <body>
+    <main>
+      <h1>Options de l'extension</h1>
+      <p class="message">
+        Un profil Chrome par compte Vinted, chacun avec son propre jeton (Paramètres → Automatisation dans vinted-manager).
+      </p>
+      <form id="formulaire">
+        <label for="url">URL du backend vinted-manager</label>
+        <input id="url" type="url" placeholder="http://localhost:8000" />
+        <label for="jeton">Jeton du compte</label>
+        <input id="jeton" type="password" autocomplete="off" placeholder="vmx_…" />
+        <div class="ligne"><button type="submit">Enregistrer et tester</button></div>
+      </form>
+      <p id="resultat" class="message"></p>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>

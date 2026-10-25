@@ -1,0 +1,25 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "https://api.vinted.fr/messaging/main/conversations/01a16aa3-daff-79bb-a570-c156d97cb288/replies",
+    "json": {
+      "content": "Bonjour n'oublie pas que tu as accepté l'offre ;)",
+      "is_personal_data_sharing_check_skipped": false,
+      "photo_temp_uuids": null
+    }
+  },
+  "response": {
+    "status": 201,
+    "body": {
+      "conversation_id": "01a16aa3-daff-79bb-a570-c156d97cb288",
+      "created_at": "2026-10-25T10:27:26.518581397Z",
+      "data": {
+        "content": "Bonjour n'oublie pas que tu as accepté l'offre ;)",
+        "id": "73166195419"
+      },
+      "id": "01a17299-d3db-70f0-892d-72e4df04863a",
+      "message_type": "reply_plain",
+      "sender_id": "3201823662"
+    }
+  }
+}

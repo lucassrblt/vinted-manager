@@ -66,9 +66,14 @@ def client_ssl(serveur: str, port: int) -> imaplib.IMAP4_SSL:
 
 
 def comptes_actifs(db: Session) -> list[CompteVinted]:
-    return list(
-        db.scalars(select(CompteVinted).where(CompteVinted.actif.is_(True)).order_by(CompteVinted.id))
-    )
+    """Comptes dont la boîte mail est configurée et active (un compte peut exister sans boîte)."""
+    return [
+        c
+        for c in db.scalars(
+            select(CompteVinted).where(CompteVinted.actif.is_(True)).order_by(CompteVinted.id)
+        )
+        if c.imap_configure
+    ]
 
 
 def noms_comptes(db: Session) -> dict[int, str]:
@@ -86,6 +91,9 @@ def debut_historique(db: Session) -> datetime:
 
 
 def config_depuis(compte: CompteVinted) -> ConfigImap:
+    if not compte.imap_configure:
+        raise ErreurImap(f"Aucune boîte mail configurée pour « {compte.nom} ».")
+    assert compte.imap_serveur and compte.imap_email and compte.imap_mot_de_passe_chiffre
     return ConfigImap(
         serveur=compte.imap_serveur,
         port=compte.imap_port or 993,

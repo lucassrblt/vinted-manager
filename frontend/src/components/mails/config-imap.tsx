@@ -133,7 +133,9 @@ export function ConfigurationImap() {
                       {c.nom}
                       {!c.actif && <span className="ml-2 text-xs font-normal">· en pause</span>}
                     </p>
-                    <p className="truncate text-sm text-muted-foreground">{c.imap_email}</p>
+                    <p className="truncate text-sm text-muted-foreground">
+                      {c.imap_email ?? "Aucune boîte mail : clique sur le crayon pour en brancher une"}
+                    </p>
                     <p className="text-xs text-muted-foreground tabular-nums">
                       {c.derniere_synchro ? `Synchro : ${formatDateHeure(c.derniere_synchro)}` : "Jamais synchronisée"}
                       {" · "}
@@ -142,6 +144,7 @@ export function ConfigurationImap() {
                   </div>
                   <Switch
                     checked={c.actif}
+                    disabled={!c.imap_email}
                     onCheckedChange={() => basculer.mutate(c)}
                     aria-label={c.actif ? `Mettre ${c.nom} en pause` : `Réactiver ${c.nom}`}
                   />
@@ -274,9 +277,9 @@ function DialogCompte({
       existant
         ? {
             nom: existant.nom,
-            serveur: existant.imap_serveur,
+            serveur: existant.imap_serveur ?? "imap.gmail.com",
             port: String(existant.imap_port),
-            email: existant.imap_email,
+            email: existant.imap_email ?? "",
             mot_de_passe: "",
             dossier: existant.imap_dossier,
           }

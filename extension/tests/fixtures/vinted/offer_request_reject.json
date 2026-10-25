@@ -1,0 +1,23 @@
+{
+  "request": {
+    "method": "PUT",
+    "url": "https://www.vinted.fr/api/v2/transactions/23563143719/offer_requests/5983780453/reject"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "offer_request": {
+        "id": 5983780453,
+        "price": {
+          "amount": "6.3",
+          "currency_code": "EUR"
+        },
+        "transaction_id": 23563143719,
+        "status": 30,
+        "currency": "EUR",
+        "offer": null
+      },
+      "code": 0
+    }
+  }
+}

@@ -8,6 +8,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { IndicateurBadge, LignesSquelette, MessageErreur, StatutBadge } from "@/components/commun";
+import { BlocVinted } from "@/components/stock/bloc-vinted";
 import { CelluleEditable } from "@/components/stock/cellule-editable";
 import { PhotosArticle } from "@/components/photos/photos-article";
 import { ZonePreuves } from "@/components/stock/preuves";
@@ -383,6 +384,9 @@ export default function FicheArticle() {
         </div>
 
         <div className="space-y-5">
+          <Bloc titre="Vinted">
+            <BlocVinted article={a} />
+          </Bloc>
           <Bloc titre="Historique">
             {timeline.data && timeline.data.length > 0 ? (
               <ol className="relative space-y-4 border-l pl-5">

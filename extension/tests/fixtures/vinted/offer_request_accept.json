@@ -1,0 +1,32 @@
+{
+  "request": {
+    "method": "PUT",
+    "url": "https://www.vinted.fr/api/v2/transactions/23563143719/offer_requests/5983786317/accept"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "offer_request": {
+        "id": 5983786317,
+        "price": {
+          "amount": "5.6",
+          "currency_code": "EUR"
+        },
+        "transaction_id": 23563143719,
+        "status": 20,
+        "currency": "EUR",
+        "offer": {
+          "id": 38066470016,
+          "price": {
+            "amount": "5.6",
+            "currency_code": "EUR"
+          },
+          "currency": "EUR",
+          "user_msg_thread_id": 500488301609,
+          "transaction_id": 23563143719
+        }
+      },
+      "code": 0
+    }
+  }
+}

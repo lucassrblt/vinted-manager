@@ -1,0 +1,78 @@
+{
+  "request": {
+    "method": "PUT",
+    "url": "https://www.vinted.fr/api/v2/item_upload/items/10495425715",
+    "json": {
+      "item": {
+        "id": 10495425715,
+        "currency": "EUR",
+        "temp_uuid": "37466d1d-9f43-4374-9e61-756fc85b37d7",
+        "title": "T-shirt Nike ACG violet lavande logo taille M",
+        "description": "T-shirt Nike ACG violet, taille M, super sympa.\nPorté mais en très bon état.",
+        "brand_id": 687713,
+        "brand": "Nike ACG",
+        "catalog_id": 1806,
+        "isbn": null,
+        "ai_photo": false,
+        "price": "22",
+        "package_size_id": 1,
+        "shipment_prices": {
+          "domestic": null,
+          "international": null
+        },
+        "color_ids": [
+          25
+        ],
+        "assigned_photos": [
+          {
+            "id": 45072771739,
+            "orientation": 0
+          },
+          {
+            "id": 45072771743,
+            "orientation": 0
+          },
+          {
+            "id": 45072771750,
+            "orientation": 0
+          },
+          {
+            "id": 45072771756,
+            "orientation": 0
+          }
+        ],
+        "measurement_length": null,
+        "measurement_width": null,
+        "item_attributes": [
+          {
+            "code": "condition",
+            "ids": [
+              2
+            ]
+          },
+          {
+            "code": "size",
+            "ids": [
+              208
+            ]
+          }
+        ],
+        "manufacturer": null,
+        "manufacturer_labelling": null
+      },
+      "push_up": false,
+      "parcel": null,
+      "upload_session_id": "37466d1d-9f43-4374-9e61-756fc85b37d7"
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "item": {
+        "id": 10495425715
+      },
+      "after_upload_actions": [],
+      "code": 0
+    }
+  }
+}

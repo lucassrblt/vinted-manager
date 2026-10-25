@@ -1,0 +1,416 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "https://www.vinted.fr/api/v2/item_upload/brands",
+    "query": "category_id=1806"
+  },
+  "response": {
+    "status": 304,
+    "body": {
+      "brands": [
+        {
+          "id": 53,
+          "title": "Nike",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 88,
+          "title": "Ralph Lauren",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 14,
+          "title": "adidas",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 94,
+          "title": "Tommy Hilfiger",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 12,
+          "title": "Zara",
+          "requires_authenticity_check": false,
+          "is_luxury": false,
+          "is_hvf": false,
+          "has_children": false
+        },
+        {
+          "id": 304,
+          "title": "Lacoste",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 362,
+          "title": "Carhartt",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": false,
+          "has_children": false
+        },
+        {
+          "id": 2319,
+          "title": "The North Face",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 10,
+          "title": "Levi's",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 255,
+          "title": "Calvin Klein",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 120,
+          "title": "Hugo Boss",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 7,
+          "title": "H&M",
+          "requires_authenticity_check": false,
+          "is_luxury": false,
+          "is_hvf": false,
+          "has_children": false
+        },
+        {
+          "id": 11493,
+          "title": "Hollister",
+          "requires_authenticity_check": false,
+          "is_luxury": false,
+          "is_hvf": false,
+          "has_children": false
+        },
+        {
+          "id": 191,
+          "title": "Superdry",
+          "requires_authenticity_check": false,
+          "is_luxury": false,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 36955,
+          "title": "Jack & Jones",
+          "requires_authenticity_check": false,
+          "is_luxury": false,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 105,
+          "title": "Primark",
+          "requires_authenticity_check": false,
+          "is_luxury": false,
+          "is_hvf": false,
+          "has_children": false
+        },
+        {
+          "id": 7973,
+          "title": "Champion",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 25383,
+          "title": "Boss",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 2929,
+          "title": "Fred Perry",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 52035,
+          "title": "Under Armour",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 66644,
+          "title": "Lyle & Scott",
+          "requires_authenticity_check": false,
+          "is_luxury": false,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 352755,
+          "title": "Tommy Jeans",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 139,
+          "title": "Vans",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 535,
+          "title": "Puma",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 4690593,
+          "title": "Pull & Bear",
+          "requires_authenticity_check": false,
+          "is_luxury": false,
+          "is_hvf": false,
+          "has_children": false
+        },
+        {
+          "id": 1153,
+          "title": "Uniqlo",
+          "requires_authenticity_check": false,
+          "is_luxury": false,
+          "is_hvf": false,
+          "has_children": false
+        },
+        {
+          "id": 140,
+          "title": "Bershka",
+          "requires_authenticity_check": false,
+          "is_luxury": false,
+          "is_hvf": false,
+          "has_children": false
+        },
+        {
+          "id": 4273,
+          "title": "Polo Ralph Lauren",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 2287,
+          "title": "Next",
+          "requires_authenticity_check": false,
+          "is_luxury": false,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 73306,
+          "title": "Stone Island",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 172724,
+          "title": "Shein",
+          "requires_authenticity_check": false,
+          "is_luxury": false,
+          "is_hvf": false,
+          "has_children": false
+        },
+        {
+          "id": 93,
+          "title": "Abercrombie & Fitch",
+          "requires_authenticity_check": false,
+          "is_luxury": false,
+          "is_hvf": false,
+          "has_children": false
+        },
+        {
+          "id": 2703,
+          "title": "Jordan",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 46293,
+          "title": "AllSaints",
+          "requires_authenticity_check": false,
+          "is_luxury": false,
+          "is_hvf": false,
+          "has_children": false
+        },
+        {
+          "id": 1441,
+          "title": "Emporio Armani",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 20,
+          "title": "GUESS",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 49,
+          "title": "ASOS",
+          "requires_authenticity_check": false,
+          "is_luxury": false,
+          "is_hvf": false,
+          "has_children": false
+        },
+        {
+          "id": 787,
+          "title": "Ellesse",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 60,
+          "title": "Kiabi",
+          "requires_authenticity_check": false,
+          "is_luxury": false,
+          "is_hvf": false,
+          "has_children": false
+        },
+        {
+          "id": 441,
+          "title": "Stüssy",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": false,
+          "has_children": false
+        },
+        {
+          "id": 4615783,
+          "title": "AMI",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 174,
+          "title": "River Island",
+          "requires_authenticity_check": false,
+          "is_luxury": false,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 5291,
+          "title": "FILA",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 345,
+          "title": "Le Coq Sportif",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 161,
+          "title": "Diesel",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 65,
+          "title": "Dickies",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 2615,
+          "title": "Celio",
+          "requires_authenticity_check": false,
+          "is_luxury": false,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 188676,
+          "title": "Gymshark",
+          "requires_authenticity_check": false,
+          "is_luxury": false,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 417646,
+          "title": "REPRESENT",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 3383,
+          "title": "Jules",
+          "requires_authenticity_check": false,
+          "is_luxury": false,
+          "is_hvf": true,
+          "has_children": false
+        }
+      ],
+      "disable_custom_brands": false,
+      "code": 0
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "https://www.vinted.fr/api/v2/offline_verification/eligibility",
+    "json": {
+      "item_attributes": [
+        {
+          "field_name": "brand",
+          "value": 687713
+        },
+        {
+          "field_name": "price",
+          "value": "24"
+        },
+        {
+          "field_name": "category",
+          "value": 1806
+        }
+      ]
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "evs_eligible": false,
+      "evs_warranty_included": false,
+      "ivs_eligible": false,
+      "code": 0
+    }
+  }
+}

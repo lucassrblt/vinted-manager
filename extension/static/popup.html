@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <title>vinted-manager</title>
+    <link rel="stylesheet" href="style.css" />
+    <style>body { width: 320px; }</style>
+  </head>
+  <body>
+    <main>
+      <h1>vinted-manager</h1>
+      <dl>
+        <dt>État</dt><dd><span id="statut" class="statut">…</span></dd>
+        <dt>Compte Vinted</dt><dd id="vinted">—</dd>
+        <dt>vinted-manager</dt><dd id="compte">—</dd>
+        <dt>Brouillons du jour</dt><dd id="brouillons">—</dd>
+        <dt>Dernière action</dt><dd id="action">—</dd>
+      </dl>
+      <p id="message" class="message" hidden></p>
+      <div class="ligne">
+        <button id="bascule">Pause</button>
+        <button id="options" class="secondaire">Options</button>
+      </div>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

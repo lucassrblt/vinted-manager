@@ -39,6 +39,15 @@ export interface Article {
   matiere: string | null;
   defauts: string | null;
   mesures: Record<string, string | number> | null;
+  vinted_item_id: number | null;
+  vinted_draft_id: number | null;
+  brouillon_statut: "a_creer" | "en_cours" | "cree" | "erreur" | null;
+  brouillon_erreur: string | null;
+  brouillon_cree_le: string | null;
+  couleur_a_verifier: boolean;
+  prix_initial: Decimal | null;
+  prix_plancher: Decimal | null;
+  importe_vinted: boolean;
   created_at: string;
   updated_at: string;
   prix_vente: Decimal | null;
@@ -373,9 +382,9 @@ export interface Regle {
 export interface CompteVinted {
   id: number;
   nom: string;
-  imap_serveur: string;
+  imap_serveur: string | null;
   imap_port: number;
-  imap_email: string;
+  imap_email: string | null;
   imap_dossier: string;
   actif: boolean;
   derniere_synchro: string | null;
@@ -490,4 +499,32 @@ export interface ModeleReponse {
   nom: string;
   contexte: string;
   texte: string;
+}
+
+// --- Automatisation Vinted (extension Chrome) ------------------------------------------------
+
+export interface CompteAutomatisation {
+  id: number;
+  nom: string;
+  imap_configure: boolean;
+  vinted_user_id: number | null;
+  vinted_user_id_vu: number | null;
+  vinted_login_vu: string | null;
+  jeton_defini: boolean;
+  extension_vue_le: string | null;
+  extension_version: string | null;
+  pause: boolean;
+  pause_raison: string | null;
+  brouillons_du_jour: number;
+  brouillons_max_jour: number;
+}
+
+export interface EntreeJournal {
+  id: number;
+  compte_id: number | null;
+  date: string;
+  niveau: "info" | "alerte" | "erreur";
+  type: string;
+  message: string;
+  article_id: number | null;
 }

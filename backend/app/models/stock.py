@@ -2,7 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import JSON, CheckConstraint, ForeignKey, Numeric, String, Text
+from sqlalchemy import JSON, BigInteger, CheckConstraint, ForeignKey, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base, TimestampMixin, utcnow
@@ -65,6 +65,18 @@ class Article(TimestampMixin, Base):
     description_annonce: Mapped[str | None] = mapped_column(Text)
     mots_cles_annonce: Mapped[str | None] = mapped_column(Text)
     mesures: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    # Vinted (extension) : annonce et brouillon, prix de référence pour les offres.
+    vinted_item_id: Mapped[int | None] = mapped_column(BigInteger, index=True)
+    vinted_draft_id: Mapped[int | None] = mapped_column(BigInteger, index=True)
+    brouillon_statut: Mapped[str | None] = mapped_column(String(20))  # a_creer | en_cours | cree | erreur
+    brouillon_erreur: Mapped[str | None] = mapped_column(Text)
+    brouillon_cree_le: Mapped[datetime | None]
+    # Brouillon bloqué tant qu'une photo retouchée a une couleur trop éloignée de l'original.
+    couleur_a_verifier: Mapped[bool] = mapped_column(default=False, server_default="false")
+    ai_photo_declare: Mapped[bool | None]
+    prix_initial: Mapped[Decimal | None] = mapped_column(Money)  # première publication ou import
+    prix_plancher: Mapped[Decimal | None] = mapped_column(Money)  # 82 % du prix initial
+    importe_vinted: Mapped[bool] = mapped_column(default=False, server_default="false")
     updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)
 
     batch: Mapped[Batch | None] = relationship(back_populates="articles")
@@ -141,6 +153,9 @@ class PhotoArticle(TimestampMixin, Base):
         Numeric(10, 4), default=Decimal("0")
     )  # USD, prix à 3 décimales
     erreur: Mapped[str | None] = mapped_column(Text)
+    # Contrôle de couleur (ΔE CIE76 entre l'original et la version retouchée, zone centrale).
+    ecart_couleur: Mapped[float | None]
+    couleur_validee: Mapped[bool] = mapped_column(default=False, server_default="false")
     updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)
 
 

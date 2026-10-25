@@ -11,9 +11,11 @@ from app.api import (
     annonces,
     articles,
     auth,
+    automatisation,
     batches,
     compta,
     creation,
+    extension,
     import_export,
     mails,
     photos,
@@ -78,9 +80,11 @@ def health() -> dict[str, str]:
 
 publique = APIRouter(prefix="/api")
 publique.include_router(auth.router)
+publique.include_router(extension.router)  # authentifié par X-Extension-Token
 
 protegee = APIRouter(prefix="/api", dependencies=[Depends(session_requise)])
 for module in (
+    automatisation,
     photos,
     creation,
     annonces,

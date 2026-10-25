@@ -1,0 +1,57 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "https://www.vinted.fr/api/v2/offer/estimate_with_fees",
+    "json": {
+      "item_ids": [
+        "10495425715"
+      ],
+      "offer_price": {
+        "amount": "22.00",
+        "currency_code": "EUR"
+      },
+      "fees": [
+        "buyer_protection"
+      ]
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "total_price": {
+        "amount": "23.8",
+        "currency_code": "EUR"
+      },
+      "buyer_protection": {
+        "discount": {
+          "amount": "0.0",
+          "currency_code": "EUR"
+        },
+        "discount_percentage": 0,
+        "final_price": {
+          "amount": "1.8",
+          "currency_code": "EUR"
+        },
+        "lowest_price_30_days": {
+          "amount": "1.8",
+          "currency_code": "EUR"
+        },
+        "original_price": {
+          "amount": "1.8",
+          "currency_code": "EUR"
+        },
+        "pricing_rule": {
+          "fixed_part": {
+            "amount": "0.7",
+            "currency_code": "EUR"
+          },
+          "has_nth_transaction_fact": false,
+          "id": "bf4968a0-e31a-4253-865d-819afcfb5128",
+          "is_ab_test": false,
+          "offer_price_percentage": 5,
+          "percentage": 5
+        }
+      }
+    }
+  }
+}

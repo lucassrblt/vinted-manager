@@ -1,0 +1,38 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "https://www.vinted.fr/api/v2/closet/seller_filters"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "filters": [
+        {
+          "name": "All",
+          "count": 13
+        },
+        {
+          "name": "Active",
+          "count": 4
+        },
+        {
+          "name": "Reserved",
+          "count": 0
+        },
+        {
+          "name": "Hidden",
+          "count": 0
+        },
+        {
+          "name": "Drafts",
+          "count": 3
+        },
+        {
+          "name": "Sold",
+          "count": 6
+        }
+      ],
+      "code": 0
+    }
+  }
+}

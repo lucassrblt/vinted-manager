@@ -1,0 +1,23 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "https://www.vinted.fr/api/v2/transactions/23562720554/offers/seller_options"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "seller_offer_options": {
+        "min_price": {
+          "amount": "1.0",
+          "currency_code": "EUR"
+        },
+        "max_price": {
+          "amount": "322.0",
+          "currency_code": "EUR"
+        },
+        "fees_reduction_threshold": null
+      },
+      "code": 0
+    }
+  }
+}

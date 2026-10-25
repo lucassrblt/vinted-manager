@@ -1,0 +1,12 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "https://api.vinted.fr/messaging/main/users/unread_count"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "unread_count": 2
+    }
+  }
+}

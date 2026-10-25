@@ -1,0 +1,97 @@
+/** Client du backend vinted-manager, utilisé uniquement par le service worker. */
+import type { ChargeBrouillon } from "./vinted/brouillon";
+
+export interface CompteBackend {
+  compte_id: number;
+  nom: string;
+  vinted_user_id: number | null;
+  pause: boolean;
+  pause_raison: string | null;
+  brouillons_du_jour: number;
+  brouillons_max_jour: number;
+}
+
+export class ErreurBackend extends Error {
+  constructor(
+    message: string,
+    public readonly statut: number,
+  ) {
+    super(message);
+    this.name = "ErreurBackend";
+  }
+}
+
+export type FetchBackend = (url: string, init: RequestInit) => Promise<Response>;
+
+export class ClientBackend {
+  constructor(
+    private readonly fetch: FetchBackend,
+    private readonly url: string,
+    private readonly jeton: string,
+  ) {}
+
+  private async requete(methode: string, chemin: string, corps?: unknown): Promise<Response> {
+    let res: Response;
+    try {
+      res = await this.fetch(`${this.url.replace(/\/+$/, "")}/api/extension${chemin}`, {
+        method: methode,
+        headers: {
+          "X-Extension-Token": this.jeton,
+          ...(corps !== undefined ? { "Content-Type": "application/json" } : {}),
+        },
+        body: corps !== undefined ? JSON.stringify(corps) : undefined,
+      });
+    } catch {
+      throw new ErreurBackend("vinted-manager injoignable : le backend est-il lancé ?", 0);
+    }
+    if (res.status === 401) throw new ErreurBackend("Jeton d'extension refusé : vérifie les options.", 401);
+    if (!res.ok) {
+      let detail = `Erreur ${res.status}`;
+      try {
+        const corpsErreur = (await res.json()) as { detail?: unknown };
+        if (typeof corpsErreur.detail === "string") detail = corpsErreur.detail;
+      } catch {
+        /* corps non JSON */
+      }
+      throw new ErreurBackend(detail, res.status);
+    }
+    return res;
+  }
+
+  private async json<T>(methode: string, chemin: string, corps?: unknown): Promise<T | null> {
+    const res = await this.requete(methode, chemin, corps);
+    if (res.status === 204) return null;
+    return (await res.json()) as T;
+  }
+
+  async compte(): Promise<CompteBackend> {
+    return (await this.json<CompteBackend>("GET", "/compte"))!;
+  }
+
+  async heartbeat(vintedUserId: number | null, login: string | null, version: string): Promise<CompteBackend> {
+    return (await this.json<CompteBackend>("POST", "/heartbeat", { vinted_user_id: vintedUserId, login, version }))!;
+  }
+
+  async arret(raison: string): Promise<CompteBackend> {
+    return (await this.json<CompteBackend>("POST", "/arret", { raison }))!;
+  }
+
+  async pause(pause: boolean): Promise<CompteBackend> {
+    return (await this.json<CompteBackend>("POST", pause ? "/pause" : "/reprendre"))!;
+  }
+
+  brouillonSuivant(): Promise<ChargeBrouillon | null> {
+    return this.json<ChargeBrouillon>("GET", "/brouillons/suivant");
+  }
+
+  async resultatBrouillon(
+    articleId: number,
+    r: { ok: boolean; vinted_draft_id?: number; ai_photo?: boolean; erreur?: string; arret?: boolean },
+  ): Promise<void> {
+    await this.requete("POST", `/brouillons/${articleId}/resultat`, r);
+  }
+
+  async photo(photoId: number): Promise<ArrayBuffer> {
+    return (await this.requete("GET", `/photos/${photoId}`)).arrayBuffer();
+  }
+}

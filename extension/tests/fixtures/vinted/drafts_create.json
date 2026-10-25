@@ -1,0 +1,102 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "https://www.vinted.fr/api/v2/item_upload/drafts",
+    "json": {
+      "draft": {
+        "id": null,
+        "currency": "EUR",
+        "temp_uuid": "dda52385-fcba-4185-804b-7a34b822dca8",
+        "title": "titre",
+        "description": "description",
+        "brand_id": 687713,
+        "brand": "Nike ACG",
+        "catalog_id": 1806,
+        "isbn": null,
+        "ai_photo": false,
+        "price": "24",
+        "package_size_id": 1,
+        "shipment_prices": {
+          "domestic": null,
+          "international": null
+        },
+        "color_ids": [
+          25
+        ],
+        "assigned_photos": [
+          {
+            "id": 36532004066,
+            "orientation": 0,
+            "ai_detected": false,
+            "digital_source_type": [],
+            "c2pa_read_error": "other"
+          },
+          {
+            "id": 36532003594,
+            "orientation": 0,
+            "ai_detected": false,
+            "digital_source_type": [],
+            "c2pa_read_error": "other"
+          },
+          {
+            "id": 36532003772,
+            "orientation": 0,
+            "ai_detected": false,
+            "digital_source_type": [],
+            "c2pa_read_error": "other"
+          },
+          {
+            "id": 36532003830,
+            "orientation": 0,
+            "ai_detected": false,
+            "digital_source_type": [],
+            "c2pa_read_error": "other"
+          },
+          {
+            "id": 36532003749,
+            "orientation": 0,
+            "ai_detected": false,
+            "digital_source_type": [],
+            "c2pa_read_error": "other"
+          }
+        ],
+        "measurement_length": null,
+        "measurement_width": null,
+        "item_attributes": [
+          {
+            "code": "size",
+            "ids": [
+              208
+            ]
+          },
+          {
+            "code": "condition",
+            "ids": [
+              6
+            ]
+          },
+          {
+            "code": "material",
+            "ids": [
+              44
+            ]
+          }
+        ],
+        "manufacturer": null,
+        "manufacturer_labelling": null
+      },
+      "parcel": null,
+      "upload_session_id": "dda52385-fcba-4185-804b-7a34b822dca8"
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "draft": {
+        "id": 10522041322
+      },
+      "after_upload_actions": [],
+      "code": 0
+    }
+  }
+}

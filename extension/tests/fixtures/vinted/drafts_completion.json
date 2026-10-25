@@ -1,0 +1,86 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "https://www.vinted.fr/api/v2/item_upload/drafts/10521949755/completion",
+    "json": {
+      "draft": {
+        "id": 10521949755,
+        "currency": "EUR",
+        "temp_uuid": "965f9442-86be-4b42-ba70-d2844206ffc6",
+        "title": "Titre de test",
+        "description": "description de test",
+        "brand_id": 28689,
+        "brand": "Autograph",
+        "catalog_id": 268,
+        "isbn": null,
+        "ai_photo": false,
+        "price": "8",
+        "package_size_id": 2,
+        "shipment_prices": {
+          "domestic": null,
+          "international": null
+        },
+        "color_ids": [
+          3
+        ],
+        "assigned_photos": [
+          {
+            "id": 45219082918,
+            "orientation": 0
+          },
+          {
+            "id": 45219082922,
+            "orientation": 0
+          },
+          {
+            "id": 45219082924,
+            "orientation": 0
+          },
+          {
+            "id": 45219082928,
+            "orientation": 0
+          }
+        ],
+        "measurement_length": null,
+        "measurement_width": null,
+        "item_attributes": [
+          {
+            "code": "material",
+            "ids": [
+              44
+            ]
+          },
+          {
+            "code": "condition",
+            "ids": [
+              2
+            ]
+          },
+          {
+            "code": "size",
+            "ids": [
+              208
+            ]
+          }
+        ],
+        "manufacturer": null,
+        "manufacturer_labelling": null
+      },
+      "push_up": false,
+      "parcel": null,
+      "upload_session_id": "965f9442-86be-4b42-ba70-d2844206ffc6"
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "item": {
+        "id": 10521949755
+      },
+      "after_upload_actions": [
+        "show_upload_another_item_tip"
+      ],
+      "code": 0
+    }
+  }
+}

@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import JSON, ForeignKey, Numeric, String, Text
+from sqlalchemy import JSON, BigInteger, ForeignKey, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, TimestampMixin, utcnow
@@ -91,19 +91,57 @@ class Parametres(Base):
         JSON,
         default=lambda: {"vente": True, "litige": True, "offre": True, "rappel_envois": True},
     )
+    # Brouillons automatiques : la photo « devant » publiée est l'originale (redressée, recadrée).
+    premiere_photo_reelle: Mapped[bool] = mapped_column(default=True, server_default="true")
 
 
 class CompteVinted(TimestampMixin, Base):
-    """Un compte Vinted et la boîte mail qui reçoit ses notifications (lue en IMAP)."""
+    """Un compte Vinted, la boîte mail qui reçoit ses notifications (lue en IMAP, facultative)
+    et l'extension Chrome qui agit sur Vinted pour lui."""
 
     __tablename__ = "compte_vinted"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     nom: Mapped[str] = mapped_column(String(80))
-    imap_serveur: Mapped[str] = mapped_column(String(255))
+    # Boîte mail : facultative (un compte peut n'être piloté que par l'extension).
+    imap_serveur: Mapped[str | None] = mapped_column(String(255))
     imap_port: Mapped[int] = mapped_column(default=993)
-    imap_email: Mapped[str] = mapped_column(String(255))
-    imap_mot_de_passe_chiffre: Mapped[str] = mapped_column(Text)
+    imap_email: Mapped[str | None] = mapped_column(String(255))
+    imap_mot_de_passe_chiffre: Mapped[str | None] = mapped_column(Text)
     imap_dossier: Mapped[str] = mapped_column(String(255), default="INBOX")
     actif: Mapped[bool] = mapped_column(default=True)
     derniere_synchro: Mapped[datetime | None]
+    # Extension : identifiant Vinted attendu (contrôle avant chaque lot d'actions), jeton hashé (SHA-256).
+    vinted_user_id: Mapped[int | None] = mapped_column(BigInteger, unique=True)
+    # Dernier compte Vinted vu par l'extension dans le profil Chrome (à confirmer dans l'app).
+    vinted_user_id_vu: Mapped[int | None] = mapped_column(BigInteger)
+    vinted_login_vu: Mapped[str | None] = mapped_column(String(120))
+    jeton_extension_hash: Mapped[str | None] = mapped_column(String(64), unique=True)
+    extension_vue_le: Mapped[datetime | None]
+    extension_version: Mapped[str | None] = mapped_column(String(40))
+    telegram_chat_id: Mapped[str | None] = mapped_column(String(40))
+    # Arrêt du compte : rien n'est exécuté sur Vinted, les tâches restent en file. Reprise manuelle.
+    pause: Mapped[bool] = mapped_column(default=False, server_default="false")
+    pause_raison: Mapped[str | None] = mapped_column(Text)
+    # Réglages de l'automatisation (voir services/reglages.py pour les valeurs par défaut).
+    reglages: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+
+    @property
+    def imap_configure(self) -> bool:
+        return bool(self.imap_serveur and self.imap_email and self.imap_mot_de_passe_chiffre)
+
+
+class JournalVinted(Base):
+    """Ce que fait et observe l'extension : actions, erreurs Vinted, arrêts. Consultable dans l'app."""
+
+    __tablename__ = "journal_vinted"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    compte_id: Mapped[int | None] = mapped_column(
+        ForeignKey("compte_vinted.id", ondelete="CASCADE"), index=True
+    )
+    date: Mapped[datetime] = mapped_column(default=utcnow, index=True)
+    niveau: Mapped[str] = mapped_column(String(10), default="info")  # info | alerte | erreur
+    type: Mapped[str] = mapped_column(String(40))
+    message: Mapped[str] = mapped_column(Text)
+    article_id: Mapped[int | None] = mapped_column(ForeignKey("article.id", ondelete="SET NULL"))

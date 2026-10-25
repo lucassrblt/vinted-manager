@@ -38,6 +38,8 @@ class PhotoOut(BaseModel):
     nb_generations: int
     cout_estime: Decimal
     erreur: str | None
+    ecart_couleur: float | None = None
+    couleur_validee: bool = False
     updated_at: datetime
 
 
@@ -62,11 +64,7 @@ def _photo(db: Db, photo_id: int) -> PhotoArticle:
 
 
 def _photos_article(db: Db, article_id: int) -> list[PhotoArticle]:
-    rang = {t: i for i, t in enumerate(photos.ORDRE_TYPES)}
-    return sorted(
-        db.scalars(select(PhotoArticle).where(PhotoArticle.article_id == article_id)),
-        key=lambda p: (rang.get(p.type, 99), p.ordre, p.id),
-    )
+    return photos.photos_ordonnees(db, article_id)
 
 
 async def _lire_image(fichier: UploadFile) -> bytes:
@@ -241,6 +239,7 @@ def zip_photos(article_id: int, db: Db) -> StreamingResponse:
 
 
 class ParametresPhotos(BaseModel):
+    premiere_photo_reelle: bool
     modele: str  # modèle « haute qualité » (bouton de régénération premium)
     modeles_par_type: dict[str, str]
     fond_defini: bool
@@ -260,6 +259,7 @@ def lire_parametres(db: Db) -> ParametresPhotos:
     ).all()
     par_type = {t: photos.modele_pour(p, t) for t in photos.TYPES_RETOUCHES}
     return ParametresPhotos(
+        premiere_photo_reelle=p.premiere_photo_reelle,
         modele=p.modele_photos,
         modeles_par_type=par_type,
         fond_defini=bool(p.photo_fond),
@@ -274,6 +274,7 @@ def lire_parametres(db: Db) -> ParametresPhotos:
 
 
 class ModifParametresPhotos(BaseModel):
+    premiere_photo_reelle: bool | None = None
     modele: str | None = None
     modeles_par_type: dict[str, str] | None = None
 
@@ -281,6 +282,8 @@ class ModifParametresPhotos(BaseModel):
 @router.put("/parametres/photos", response_model=ParametresPhotos)
 def modifier_parametres(data: ModifParametresPhotos, db: Db) -> ParametresPhotos:
     p = get_parametres(db)
+    if data.premiere_photo_reelle is not None:
+        p.premiere_photo_reelle = data.premiere_photo_reelle
     if data.modele is not None:
         if data.modele not in replicate_client.PRIX_PAR_IMAGE:
             raise HTTPException(422, "Modèle non pris en charge.")
@@ -434,6 +437,7 @@ def choisir_variante(variante_id: int, data: ChoisirIn, db: Db) -> PhotoOut:
     p.fichier_genere, p.modele = v.fichier, v.modele
     p.statut, p.version_choisie, p.erreur = "genere", "genere", None
     p.disposition = v.disposition
+    p.ecart_couleur, p.couleur_validee = photos.mesurer_couleur(p), False
     if (
         ancien
         and ancien != v.fichier

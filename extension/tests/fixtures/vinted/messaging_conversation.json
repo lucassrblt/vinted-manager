@@ -1,0 +1,202 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "https://api.vinted.fr/messaging/main/conversations/01a16aa3-daff-79bb-a570-c156d97cb288"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "allow_reply": true,
+      "conversation_type": "inquiry",
+      "core_id_deprecated": 500444014737,
+      "created_at": "2026-10-23T21:21:25Z",
+      "data": {
+        "can_buyer_add_more_items": false,
+        "current_user_side": "seller",
+        "id": "01a16aa3-db12-704f-9ad5-9ce1955be06c",
+        "inquiry_value": {
+          "amount": "5.00",
+          "currency_code": "EUR"
+        },
+        "is_seller_business": false,
+        "items": [
+          {
+            "inquiry_item_id": "01a16aa3-dc1f-717b-a007-1a3214c639d8",
+            "inventory_item_id": "10475120267",
+            "is_deleted": false,
+            "photos": [
+              {
+                "dominant_color_opaque": "#E5E7EA",
+                "full_size_url": "https://images1.vinted.net/tc/06_0122f_9gTm99QEjb7p6874cfDBxABG/f3f1b1d3.webp?s=87e84469b7e59cf4b96259f25b9a10c288cf594f",
+                "height": 800,
+                "image_no": 1,
+                "thumbnails": [
+                  {
+                    "height": 624,
+                    "url": "https://images1.vinted.net/t/06_0122f_9gTm99QEjb7p6874cfDBxABG/428x624/f3f1b1d3.webp?s=fcc6be4a6bb97a5abb2b2e29ca1e8c6c0f5d1027",
+                    "width": 428
+                  },
+                  {
+                    "height": 428,
+                    "url": "https://images1.vinted.net/t/06_0122f_9gTm99QEjb7p6874cfDBxABG/624x428/f3f1b1d3.webp?s=b25a168e733cbc8165f8b76c93df4237fcf867af",
+                    "width": 624
+                  },
+                  {
+                    "height": 428,
+                    "url": "https://images1.vinted.net/t/06_0122f_9gTm99QEjb7p6874cfDBxABG/364x428/f3f1b1d3.webp?s=393383db20c4051e6eb632f1fa33b818889a540d",
+                    "width": 364
+                  },
+                  {
+                    "height": 100,
+                    "url": "https://images1.vinted.net/t/06_0122f_9gTm99QEjb7p6874cfDBxABG/70x100/f3f1b1d3.webp?s=4d3f844d313caf855769c9671aeefc86e9439189",
+                    "width": 70
+                  },
+                  {
+                    "height": 210,
+                    "url": "https://images1.vinted.net/t/06_0122f_9gTm99QEjb7p6874cfDBxABG/150x210/f3f1b1d3.webp?s=3aa3d9a5c5636a18f519f366a656ee4b9781c1df",
+                    "width": 150
+                  },
+                  {
+                    "height": 430,
+                    "url": "https://images1.vinted.net/t/06_0122f_9gTm99QEjb7p6874cfDBxABG/310x430/f3f1b1d3.webp?s=b55adefc5f3a9e72bd7bc54267a560599c0c80e0",
+                    "width": 310
+                  }
+                ],
+                "url": "https://images1.vinted.net/t/06_0122f_9gTm99QEjb7p6874cfDBxABG/f800/f3f1b1d3.webp?s=53ee045e19350207166b9a8dfde39127c6e9bdca",
+                "width": 600
+              }
+            ],
+            "title": "Sweat col rond Uniqlo gris chiné taille L"
+          }
+        ],
+        "seller_bundle_discounts": {
+          "discounts": [],
+          "enabled": false
+        },
+        "service_fee": {
+          "amount": "0.95",
+          "currency_code": "EUR"
+        },
+        "show_suggested_messages_for_seller": false,
+        "total_price": {
+          "amount": "5.95",
+          "currency_code": "EUR"
+        },
+        "transaction_id": "23517428140"
+      },
+      "id": "01a16aa3-daff-79bb-a570-c156d97cb288",
+      "is_deletable": true,
+      "is_peeking": false,
+      "is_seen": false,
+      "is_unread_by_current_user": false,
+      "localization": null,
+      "messages": [
+        {
+          "conversation_id": "01a16aa3-daff-79bb-a570-c156d97cb288",
+          "created_at": "2026-10-23T21:21:29Z",
+          "data": {
+            "created_at_ts": "2026-10-23T23:21:29+02:00",
+            "entity": {
+              "body": "5,00 €",
+              "currency": "EUR",
+              "current": true,
+              "offer_request_id": 5968844926,
+              "original_price": {
+                "amount": "7.0",
+                "currency_code": "EUR"
+              },
+              "original_price_label": "7,00 €",
+              "price": {
+                "amount": "5.0",
+                "currency_code": "EUR"
+              },
+              "price_fixed": true,
+              "price_label": "5,00 €",
+              "status": 20,
+              "status_title": "- Offre acceptée",
+              "title": "Hey, membre_test_10 t'a fait une offre",
+              "transaction_id": 23517428140,
+              "user_id": 900000014
+            },
+            "entity_type": "offer_request_message",
+            "id": 5968844926
+          },
+          "id": "01a17299-d5a4-7bff-9644-655324ba213b",
+          "message_type": "legacy_offer_request",
+          "sender_id": "900000014"
+        },
+        {
+          "conversation_id": "01a16aa3-daff-79bb-a570-c156d97cb288",
+          "created_at": "2026-10-25T10:27:26Z",
+          "data": {
+            "created_at_ts": "2026-10-25T11:27:26+01:00",
+            "created_time_ago": "moins d'une minute",
+            "entity": {
+              "body": "Bonjour n'oublie pas que tu as accepté l'offre ;)",
+              "id": 73166195419,
+              "is_hidden": false,
+              "photos": [],
+              "safety_flag": 0,
+              "sent_via_mobile": false,
+              "user_id": 3201823662
+            },
+            "entity_type": "message"
+          },
+          "id": "01a17299-d5a4-7c0a-98be-3164eb2411ae",
+          "message_type": "legacy_reply",
+          "sender_id": "3201823662"
+        }
+      ],
+      "opposite_users": [
+        {
+          "data": {
+            "id": "900000014",
+            "is_hated": false,
+            "is_on_holiday": false,
+            "last_logged_in_at": "2026-10-24T16:34:58Z",
+            "location_description": "France, Schiltigheim",
+            "login_name": "membre_test_10",
+            "photo": {
+              "dominant_color_opaque": "#DBE6F9",
+              "full_size_url": "https://images1.vinted.net/tc/03_01b3f_5XmXtZnzfJTcmuFRhpAcw5Li/5f10ba0d.webp?s=9089e9e16dbc45d1a74e87778b9108718e99e117",
+              "thumbnails": [
+                {
+                  "height": 200,
+                  "url": "https://images1.vinted.net/t/03_01b3f_5XmXtZnzfJTcmuFRhpAcw5Li/200x200/5f10ba0d.webp?s=5b1fc03ad3db55afef8ddac81348b6336a3fd8de",
+                  "width": 200
+                },
+                {
+                  "height": 100,
+                  "url": "https://images1.vinted.net/t/03_01b3f_5XmXtZnzfJTcmuFRhpAcw5Li/100x100/5f10ba0d.webp?s=060dd089eef94e14cd79b4327af243b04f179f82",
+                  "width": 100
+                },
+                {
+                  "height": 50,
+                  "url": "https://images1.vinted.net/t/03_01b3f_5XmXtZnzfJTcmuFRhpAcw5Li/50x50/5f10ba0d.webp?s=f2456c4030dae39a011ad370fd57d6ca28dabeb5",
+                  "width": 50
+                },
+                {
+                  "height": 20,
+                  "url": "https://images1.vinted.net/t/03_01b3f_5XmXtZnzfJTcmuFRhpAcw5Li/20x20/5f10ba0d.webp?s=088e476ebb26d83bc6801b06fcdfe3cd3042c2d7",
+                  "width": 20
+                },
+                {
+                  "height": 400,
+                  "url": "https://images1.vinted.net/t/03_01b3f_5XmXtZnzfJTcmuFRhpAcw5Li/400x400/5f10ba0d.webp?s=354481960fc2c9b8ac6816d4c5ee5ec7b57268f3",
+                  "width": 400
+                }
+              ],
+              "url": "https://images1.vinted.net/t/03_01b3f_5XmXtZnzfJTcmuFRhpAcw5Li/f800/5f10ba0d.webp?s=9d71e4cf42a04ab6dfbfa00edec2da832dde9608"
+            }
+          },
+          "type": "member"
+        }
+      ],
+      "pagination": {
+        "has_next": false,
+        "has_prev": false
+      },
+      "peeking_as_side": null
+    }
+  }
+}

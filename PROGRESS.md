@@ -248,3 +248,93 @@ Les 4 étapes du cahier des charges sont faites. Ce qui reste à valider avec te
 - **Écoute IMAP IDLE** (`services/imap_idle.py`) : une connexion en lecture seule par boîte active ; Gmail prévient dès qu'un mail arrive et la synchro part aussitôt (notification en ~10 s). Connexion renouvelée toutes les 9 min, reconnexion automatique après une erreur (30 s → 5 min), écoutes vérifiées chaque minute (boîte ajoutée, modifiée, mise en pause). `ECOUTE_TEMPS_REEL=false` la coupe.
 - **Synchro planifiée toutes les minutes** en production (`INTERVALLE_SYNCHRO_MINUTES=1`), filet de sécurité si l'écoute tombe. Les mails déjà connus ne sont plus retéléchargés : seul leur en-tête Message-ID est relu.
 - **Journal de synchro** : nettoyé chaque nuit (7 derniers jours conservés).
+
+# Extension d'automatisation Vinted (branche `extension-vinted`, spécification `SPEC_EXTENSION.md`)
+
+Développée en autonomie le 25/10/2026, phase par phase (un commit par phase). Aucun appel réel à Vinted : tout est
+testé contre les captures anonymisées de `extension/tests/fixtures/vinted/` (copie de `fixtures/vinted/`).
+
+**Point de départ** : la branche part de `main` **plus** le travail non commité présent dans l'arbre de `main` le
+25/10 (écoute IMAP IDLE, notifications détaillées), recopié à l'identique dans un premier commit pour partir de l'état
+déployé. `main` n'a pas été touchée ; la branche vit dans un worktree séparé (`../vinted-manager-extension`).
+
+## Phase 1 : socle de l'extension et brouillons automatiques ✅
+
+### Fait
+- **Comptes Vinted** : `vinted_user_id` (attendu), jeton d'extension hashé (SHA-256, comparé en temps constant),
+  dernière activité et version de l'extension, `telegram_chat_id`, `pause` (+ raison), réglages JSON. Boîte mail
+  facultative : la synchro IMAP et l'écoute ignorent les comptes sans boîte ; « Débrancher » une boîte garde un compte
+  piloté par l'extension.
+- **Article** : `vinted_item_id`, `vinted_draft_id`, `brouillon_statut` / `brouillon_erreur` / `brouillon_cree_le`,
+  `prix_initial`, `prix_plancher` (82 %), `couleur_a_verifier`, `ai_photo_declare`, `importe_vinted`. Migration
+  `c4a1e7d2f950` (vérifiée : upgrade, `alembic check`, downgrade).
+- **Routes de l'extension** (`/api/extension/…`, en-tête `X-Extension-Token`) : `compte`, `heartbeat`,
+  `brouillons/suivant`, `photos/{id}` (JPEG publié, seulement pour un article du compte), `brouillons/{id}/resultat`,
+  `arret`, `pause`, `reprendre`.
+- **Brouillon** : article du compte, « reçu à publier », titre + description + prix, photos terminées ; 6 par jour et
+  par compte (réglable), de 8 h à 23 h (Paris), un seul à la fois. Charge utile complète (`condition_id`,
+  `package_size_id`, `ai_photo`, photos dans l'ordre du zip).
+- **Complétude** : devant, dos, étiquette et 5 photos au total, sinon refus (« Photo manquante : dos. ») avec
+  notification ; « Relancer le brouillon » sur la fiche article.
+- **Fidélité des photos** : « Première photo réelle » (Paramètres → Photos, activé par défaut) ; contrôle de couleur
+  ΔE (Lab, zone centrale) entre original et retouche, au-delà de 10 brouillon bloqué jusqu'à « Couleur fidèle » sur la
+  photo. `ai_photo = true` dès qu'une photo publiée est générée.
+- **Style** : les deux exemples de Lucas ajoutés à `prompts/style_annonce.txt`.
+- **Extension** (`extension/`, Manifest V3, TypeScript strict, esbuild, Vitest, sans framework) :
+  client Vinted unique (`src/vinted/client.ts`), création du brouillon pas à pas comme le site (photos une par une
+  2 à 5 s d'écart, catégorie suggérée, attributs, taille, marque, couleur, matière, brouillon), contrôle du compte
+  connecté avant chaque lot, arrêt sur 401/403/429/captcha/réponse non JSON, jamais de nouvel essai. Service worker :
+  alarme de 30 s, signal de vie chaque minute, au plus un brouillon toutes les 5 min + 0 à 120 s. Popup (compte,
+  état, brouillons x/6, dernière action, Pause/Reprendre) et page d'options (URL du backend, jeton).
+- **App** : Paramètres → **Automatisation** (comptes, jeton affiché une seule fois, compte Vinted attendu avec
+  « C'est bien ce compte », pause, journal de l'extension) ; bloc **Vinted** sur la fiche article.
+
+### Tests
+- Backend : 22 nouveaux tests (`tests/test_extension_brouillons.py`), dont les 5 tests de réception : brouillon
+  complet, article de la sœur jamais servi au profil de Lucas, refus sans dos avec notification, 7ᵉ demande du jour
+  refusée, 403 → pause. 204 tests au total, ruff et mypy OK.
+- Extension : 36 tests Vitest. Le brouillon envoyé est **identique à la capture du site** (`drafts_create.json`) ;
+  403, 401, 429, captcha (HTML et DataDome JSON), réponse non JSON, mauvais compte (aucune écriture), taille et marque
+  introuvables, cadence du service worker. `tsc` strict OK.
+- Frontend : lint, types, Vitest et build OK.
+
+### Décisions prises (phase 1)
+- **Compte Vinted attendu obligatoire** : sans `vinted_user_id` confirmé, aucune action. L'extension remonte le compte
+  vu dans le profil ; Lucas le confirme d'un clic (ou saisit l'identifiant).
+- **Quota** : chaque brouillon demandé compte, réussi ou non (chaque essai agit sur Vinted).
+- **Article sans aucune photo dans l'app** : simplement ignoré (pas de notification), pour ne pas alerter sur les
+  articles publiés à la main.
+- **Brouillon resté « en cours » 30 min** sans résultat : passé en erreur (« vérifie les brouillons sur Vinted avant de
+  relancer »), jamais relancé automatiquement.
+- **Couleur** : toutes les photos publiées en version retouchée sont contrôlées ; une photo non mesurable bloque aussi ;
+  une régénération remet le contrôle à zéro.
+- **Recadrage de la première photo** : au format 3:4 seulement s'il retire au plus 25 % de l'image (on ne coupe jamais
+  un vêtement photographié en paysage).
+- **Taille du colis** : 1 pour t-shirt, top, débardeur, polo, maillot, chemise, bonnet, casquette, chaussettes,
+  ceinture ; 2 sinon (dont vestes et catégorie inconnue).
+- **Plancher** = 82 % du prix initial **arrondi aux 50 centimes supérieurs** (jamais sous 82 %).
+- **Marque** : celle de la fiche prime (titre exact dans les suggestions puis la liste de la catégorie) ; la marque
+  proposée par Vinted n'est reprise que si la fiche n'en a pas (ou porte le même nom). Sinon : erreur, jamais une autre
+  marque.
+- **Couleur et matière** : suggestion de Vinted d'abord (comme le site), correspondance avec la fiche sinon.
+- **Éligibilité** (`offline_verification/eligibility`) non appelée : facultative, un appel de moins.
+- **Attribut obligatoire inconnu** dans une catégorie : erreur, pas de brouillon partiel.
+- `users/current` relu au plus toutes les 5 min pour le signal de vie, et systématiquement avant chaque brouillon. Son
+  format (`{"user": {"id", "login"}}`) n'a pas de capture : à confirmer au premier lancement.
+- **Pause / Reprendre de la popup** = pause du compte dans vinted-manager ; « Reprendre » vaut reprise manuelle.
+- URL du backend autre que `localhost:8000` : l'accès est demandé à l'enregistrement des options
+  (`optional_host_permissions`).
+- TypeScript 5 (comme le frontend) pour l'extension.
+
+### À tester toi-même (phase 1, sur le compte Vinted **secondaire**)
+1. Déployer la branche (la migration s'applique au démarrage).
+2. `cd extension && npm install && npm run build`, puis Chrome → `chrome://extensions` → mode développeur →
+   « Charger l'extension non empaquetée » → dossier `extension/dist`, dans le profil Chrome du compte de test.
+3. Paramètres → Automatisation : « Générer un jeton d'extension », le coller dans les options de l'extension avec
+   l'URL du backend (celui qui a tes données : Railway en production, ou `http://localhost:8000`).
+4. Ouvrir un onglet www.vinted.fr connecté au compte de test ; dans la minute, la popup affiche le compte : cliquer
+   « C'est bien ce compte » dans Paramètres → Automatisation.
+5. Préparer un article de test attribué à ce compte (reçu à publier, annonce, prix, photos devant, dos, étiquette et
+   5 au total) et attendre au plus ~7 min : vérifier le brouillon sur Vinted (ordre des photos, première photo réelle,
+   titre, description, prix, catégorie, marque, taille, état, couleur, déclaration IA).
+6. Vérifier qu'un article sans photo de dos est refusé (notification) et qu'un article de l'autre compte n'est pas pris.

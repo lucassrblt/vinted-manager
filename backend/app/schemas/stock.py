@@ -102,6 +102,15 @@ class ArticleOut(BaseModel):
     matiere: str | None
     defauts: str | None
     mesures: dict[str, Any] | None
+    vinted_item_id: int | None = None
+    vinted_draft_id: int | None = None
+    brouillon_statut: str | None = None
+    brouillon_erreur: str | None = None
+    brouillon_cree_le: datetime | None = None
+    couleur_a_verifier: bool = False
+    prix_initial: Decimal | None = None
+    prix_plancher: Decimal | None = None
+    importe_vinted: bool = False
     created_at: datetime
     updated_at: datetime
     # Champs calculés

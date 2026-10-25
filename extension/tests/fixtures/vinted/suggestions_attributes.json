@@ -1,0 +1,126 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "https://www.vinted.fr/api/v2/item_upload/suggestions/attributes",
+    "json": {
+      "title": "titre",
+      "description": "description",
+      "category_id": 1806,
+      "suggested_category_id": 1806,
+      "image_metadata": [
+        {
+          "image_id": "06_01622_24Kccc2aCuoVhDddJLwAPfJj",
+          "orientation": "0"
+        },
+        {
+          "image_id": "05_00ba1_esTA7UvA2VRHuuLvSaKBr7nw",
+          "orientation": "0"
+        },
+        {
+          "image_id": "02_020a9_Xn2QApT1tDUamD23nF5mrJQn",
+          "orientation": "0"
+        },
+        {
+          "image_id": "02_01fd7_xzDxQ2utPjgXkwG4mmhhBLUc",
+          "orientation": "0"
+        },
+        {
+          "image_id": "05_01eb3_NfjrGtvZyGeit4sA96mQXL54",
+          "orientation": "0"
+        }
+      ],
+      "upload_session_id": "dda52385-fcba-4185-804b-7a34b822dca8",
+      "attributes": [
+        {
+          "code": "category",
+          "ids": [
+            "1806"
+          ]
+        },
+        {
+          "code": "brand",
+          "ids": [
+            "687713"
+          ]
+        },
+        {
+          "code": "size",
+          "ids": []
+        },
+        {
+          "code": "condition",
+          "ids": []
+        },
+        {
+          "code": "color",
+          "ids": []
+        },
+        {
+          "code": "material",
+          "ids": []
+        }
+      ],
+      "suggested_legacy_category_id": 1806
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "brands": [
+        {
+          "id": 687713,
+          "title": "Nike ACG",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        },
+        {
+          "id": 53,
+          "title": "Nike",
+          "requires_authenticity_check": true,
+          "is_luxury": true,
+          "is_hvf": true,
+          "has_children": false
+        }
+      ],
+      "prefill_brand": {
+        "id": 687713,
+        "title": "Nike ACG",
+        "requires_authenticity_check": true,
+        "is_luxury": true,
+        "is_hvf": true,
+        "has_children": false
+      },
+      "colors": [
+        {
+          "id": 25,
+          "title": "Lila",
+          "hex": "D297D2",
+          "code": "LILAC",
+          "order": 14
+        }
+      ],
+      "isbn": null,
+      "dynamic_attributes": [
+        {
+          "code": "color",
+          "prefill_option_ids": [],
+          "suggested_option_ids": [
+            "25"
+          ]
+        },
+        {
+          "code": "material",
+          "prefill_option_ids": [],
+          "suggested_option_ids": [
+            "44"
+          ]
+        }
+      ],
+      "models": [],
+      "prefill_model": null,
+      "code": 0
+    }
+  }
+}

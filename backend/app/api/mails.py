@@ -28,9 +28,9 @@ class CompteOut(BaseModel):
 
     id: int
     nom: str
-    imap_serveur: str
+    imap_serveur: str | None
     imap_port: int
-    imap_email: str
+    imap_email: str | None
     imap_dossier: str
     actif: bool
     derniere_synchro: datetime | None
@@ -149,7 +149,12 @@ def modifier_compte(compte_id: int, data: CompteIn, db: Db) -> CompteOut:
     _verifier_unicite(db, data.email.strip(), sauf=compte.id)
     if data.mot_de_passe:
         compte.imap_mot_de_passe_chiffre = _chiffrer(data.mot_de_passe)
-    if data.email.strip().lower() != compte.imap_email.lower() or data.dossier.strip() != compte.imap_dossier:
+    elif not compte.imap_mot_de_passe_chiffre:
+        raise HTTPException(422, "Saisis le mot de passe (d'application) de la boîte mail.")
+    if (
+        data.email.strip().lower() != (compte.imap_email or "").lower()
+        or data.dossier.strip() != compte.imap_dossier
+    ):
         compte.derniere_synchro = None  # nouvelle boîte : on relit les 30 derniers jours
     compte.nom = data.nom.strip()
     compte.imap_serveur = data.serveur.strip()
@@ -173,8 +178,14 @@ def relire_historique(compte_id: int, db: Db) -> CompteOut:
 
 @router.delete("/comptes/{compte_id}", status_code=204)
 def supprimer_compte(compte_id: int, db: Db) -> None:
-    """Débranche la boîte. Les mails, ventes et articles déjà importés sont conservés."""
-    db.delete(_get_compte(db, compte_id))
+    """Débranche la boîte. Les mails, ventes et articles déjà importés sont conservés.
+    Un compte piloté par l'extension est gardé (jeton, réglages) : seule la boîte est retirée."""
+    compte = _get_compte(db, compte_id)
+    if compte.jeton_extension_hash or compte.vinted_user_id:
+        compte.imap_serveur = compte.imap_email = compte.imap_mot_de_passe_chiffre = None
+        compte.derniere_synchro = None
+    else:
+        db.delete(compte)
     db.commit()
 
 
@@ -184,8 +195,11 @@ def tester_imap(data: TestImapIn, db: Db) -> dict[str, Any]:
     if not mot_de_passe:
         if data.compte_id is None:
             raise HTTPException(422, "Saisis le mot de passe (d'application) de la boîte mail.")
+        chiffre = _get_compte(db, data.compte_id).imap_mot_de_passe_chiffre
+        if not chiffre:
+            raise HTTPException(422, "Saisis le mot de passe (d'application) de la boîte mail.")
         try:
-            mot_de_passe = crypto.dechiffrer(_get_compte(db, data.compte_id).imap_mot_de_passe_chiffre)
+            mot_de_passe = crypto.dechiffrer(chiffre)
         except crypto.CleManquante as exc:
             raise HTTPException(500, str(exc)) from exc
     cfg = imap_sync.ConfigImap(

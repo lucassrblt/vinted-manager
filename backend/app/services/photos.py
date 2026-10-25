@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from app.db import SessionLocal
 from app.logging import log
 from app.models import Article, Parametres, PhotoArticle, PhotoVariante
-from app.services import images, replicate_client, storage
+from app.services import couleur, images, replicate_client, storage
 
 TYPES = {
     "devant": "Devant",
@@ -44,6 +44,29 @@ MODELES_COMPARAISON = [
     "bytedance/seedream-5-lite",
     "google/nano-banana-2",
 ]
+
+
+def photos_ordonnees(db: Session, article_id: int) -> list[PhotoArticle]:
+    """Photos d'un article dans l'ordre d'affichage Vinted (devant en premier), celui du zip."""
+    rang = {t: i for i, t in enumerate(ORDRE_TYPES)}
+    return sorted(
+        db.scalars(select(PhotoArticle).where(PhotoArticle.article_id == article_id)),
+        key=lambda p: (rang.get(p.type, 99), p.ordre, p.id),
+    )
+
+
+def mesurer_couleur(photo: PhotoArticle) -> float | None:
+    """Écart de couleur entre l'original et la version retouchée (None si non mesurable)."""
+    if not photo.fichier_genere:
+        return None
+    try:
+        return couleur.ecart(
+            storage.chemin_absolu(photo.fichier_original).read_bytes(),
+            storage.chemin_absolu(photo.fichier_genere).read_bytes(),
+        )
+    except Exception:  # fichier absent ou illisible : le contrôle sera refait plus tard
+        log.warning("couleur_non_mesurable", photo=photo.id)
+        return None
 
 
 def modele_pour(params: Parametres, type_photo: str, premium: bool = False) -> str:
@@ -199,6 +222,7 @@ def generer_photo(
     photo.nb_generations += 1
     photo.cout_estime += prix(modele)
     photo.statut, photo.version_choisie, photo.erreur = "genere", "genere", None
+    photo.ecart_couleur, photo.couleur_validee = mesurer_couleur(photo), False
     db.commit()
 
 

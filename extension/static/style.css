@@ -1,0 +1,38 @@
+:root {
+  color-scheme: light dark;
+  --fond: #ffffff;
+  --texte: #1c1c1e;
+  --doux: #6b6b70;
+  --bord: #e3e3e6;
+  --accent: #00897a;
+  --erreur: #c62828;
+  --attention: #b26a00;
+  font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fond: #18181b;
+    --texte: #f2f2f3;
+    --doux: #a1a1aa;
+    --bord: #2f2f35;
+    --accent: #4fc3b4;
+    --erreur: #ef7a7a;
+    --attention: #f0b65a;
+  }
+}
+body { margin: 0; background: var(--fond); color: var(--texte); }
+main { padding: 14px 16px; }
+h1 { font-size: 15px; margin: 0 0 10px; }
+dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 0 0 12px; }
+dt { color: var(--doux); }
+dd { margin: 0; font-weight: 500; }
+.statut { display: inline-block; padding: 1px 8px; border-radius: 99px; border: 1px solid var(--bord); }
+.statut.actif { color: var(--accent); border-color: var(--accent); }
+.statut.erreur, .statut.onglet_ferme { color: var(--erreur); border-color: var(--erreur); }
+.statut.pause, .statut.non_configure { color: var(--attention); border-color: var(--attention); }
+.message { color: var(--doux); margin: 0 0 12px; }
+button { font: inherit; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--bord); background: var(--accent); color: #fff; cursor: pointer; }
+button.secondaire { background: transparent; color: var(--texte); }
+label { display: block; margin: 12px 0 4px; color: var(--doux); }
+input { box-sizing: border-box; width: 100%; font: inherit; padding: 7px 9px; border-radius: 8px; border: 1px solid var(--bord); background: var(--fond); color: var(--texte); }
+.ligne { display: flex; gap: 8px; margin-top: 14px; }

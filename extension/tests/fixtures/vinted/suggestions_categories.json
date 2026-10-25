@@ -1,0 +1,44 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "https://www.vinted.fr/api/v2/item_upload/suggestions/categories",
+    "json": {
+      "image_metadata": [
+        {
+          "image_id": "06_01622_24Kccc2aCuoVhDddJLwAPfJj",
+          "orientation": "0"
+        },
+        {
+          "image_id": "05_00ba1_esTA7UvA2VRHuuLvSaKBr7nw",
+          "orientation": "0"
+        },
+        {
+          "image_id": "02_020a9_Xn2QApT1tDUamD23nF5mrJQn",
+          "orientation": "0"
+        },
+        {
+          "image_id": "02_01fd7_xzDxQ2utPjgXkwG4mmhhBLUc",
+          "orientation": "0"
+        },
+        {
+          "image_id": "05_01eb3_NfjrGtvZyGeit4sA96mQXL54",
+          "orientation": "0"
+        }
+      ],
+      "upload_session_id": "dda52385-fcba-4185-804b-7a34b822dca8"
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "categories": [
+        1806
+      ],
+      "prefill_categories": [
+        1806
+      ],
+      "legacy_first_category": 1806,
+      "code": 0
+    }
+  }
+}

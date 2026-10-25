@@ -16,3 +16,6 @@ backend/tests/data/*.xlsx
 data/
 backend/fixtures/emails/**/*.eml
 !backend/fixtures/emails/**/.gitkeep
+
+# Extension
+extension/dist/

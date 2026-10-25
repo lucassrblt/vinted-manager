@@ -97,7 +97,9 @@ class Ecouteur(threading.Thread):
     def _config(self) -> imap_sync.ConfigImap | None:
         with SessionLocal() as db:
             compte = db.get(CompteVinted, self.compte_id)
-            return imap_sync.config_depuis(compte) if compte is not None and compte.actif else None
+            if compte is None or not compte.actif or not compte.imap_configure:
+                return None
+            return imap_sync.config_depuis(compte)
 
     def run(self) -> None:
         echecs = 0

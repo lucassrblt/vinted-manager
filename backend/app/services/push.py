@@ -24,6 +24,7 @@ TYPES = {
     "favori": "Article mis en favori",
     "non_classe": "Mail Vinted non reconnu",
     "rappel_envois": "Rappel de 9 h : colis à envoyer",
+    "extension": "Extension Vinted : arrêts, erreurs, brouillons",
 }
 
 

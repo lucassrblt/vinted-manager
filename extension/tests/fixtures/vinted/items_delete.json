@@ -1,0 +1,14 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "https://www.vinted.fr/api/v2/items/10495633803/delete"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "code": 0,
+      "message": "Ok",
+      "message_code": "ok"
+    }
+  }
+}

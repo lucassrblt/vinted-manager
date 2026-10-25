@@ -1,0 +1,723 @@
+{
+  "request": {
+    "method": "POST",
+    "url": "https://www.vinted.fr/api/v2/item_upload/attributes",
+    "json": {
+      "attributes": [
+        {
+          "code": "category",
+          "value": [
+            1806
+          ]
+        }
+      ]
+    }
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "code": 0,
+      "message": null,
+      "attributes": [
+        {
+          "code": "brand",
+          "value_ids": null,
+          "value": null,
+          "configuration": null
+        },
+        {
+          "id": 8001,
+          "code": "size",
+          "value_ids": null,
+          "value": null,
+          "configuration": {
+            "title": "Taille",
+            "description": null,
+            "placeholder": "",
+            "field_placeholder": "Sélectionne une taille",
+            "validation_error_message": "",
+            "display_type": "grid",
+            "selection_type": "single",
+            "selection_limit": 1,
+            "sorting_order": null,
+            "required": true,
+            "banner": {
+              "title": null,
+              "message": "Choisis la taille qui correspond à l’étiquette de l’article.",
+              "faq": null
+            },
+            "options": [
+              {
+                "id": 14,
+                "title": "Tailles hommes",
+                "group_title": "Tailles hommes",
+                "type": "group",
+                "options": [
+                  {
+                    "id": 206,
+                    "title": "XS",
+                    "group_title": "Tailles hommes",
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 207,
+                    "title": "S",
+                    "group_title": "Tailles hommes",
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 208,
+                    "title": "M",
+                    "group_title": "Tailles hommes",
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 209,
+                    "title": "L",
+                    "group_title": "Tailles hommes",
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 210,
+                    "title": "XL",
+                    "group_title": "Tailles hommes",
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 211,
+                    "title": "XXL",
+                    "group_title": "Tailles hommes",
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 212,
+                    "title": "XXXL",
+                    "group_title": "Tailles hommes",
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 308,
+                    "title": "4XL",
+                    "group_title": "Tailles hommes",
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 309,
+                    "title": "5XL",
+                    "group_title": "Tailles hommes",
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 1192,
+                    "title": "6XL",
+                    "group_title": "Tailles hommes",
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 1193,
+                    "title": "7XL",
+                    "group_title": "Tailles hommes",
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 1194,
+                    "title": "8XL",
+                    "group_title": "Tailles hommes",
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 213,
+                    "title": "Taille unique",
+                    "group_title": "Tailles hommes",
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  }
+                ],
+                "faq": {
+                  "id": "515",
+                  "code": "MEN-CLOTHING",
+                  "text": "Guide des tailles"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "code": "measurements",
+          "value_ids": null,
+          "value": null,
+          "configuration": null
+        },
+        {
+          "id": 431,
+          "code": "condition",
+          "value_ids": null,
+          "value": null,
+          "configuration": {
+            "title": "État",
+            "description": null,
+            "placeholder": "",
+            "field_placeholder": "Sélectionne un état",
+            "validation_error_message": "",
+            "display_type": "list",
+            "selection_type": "single",
+            "selection_limit": 1,
+            "sorting_order": null,
+            "required": true,
+            "banner": null,
+            "options": [
+              {
+                "id": 1,
+                "title": "État",
+                "group_title": null,
+                "type": "group",
+                "options": [
+                  {
+                    "id": 6,
+                    "title": "Neuf avec étiquette",
+                    "group_title": null,
+                    "description": "Article neuf, jamais porté/utilisé avec étiquettes ou dans son emballage d’origine.",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 1,
+                    "title": "Neuf sans étiquette",
+                    "group_title": null,
+                    "description": "Article neuf, jamais porté/utilisé, sans étiquettes ni emballage d’origine.",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 2,
+                    "title": "Très bon état",
+                    "group_title": null,
+                    "description": "Article très peu porté/utilisé qui peut présenter de légères imperfections, mais qui reste en très bon état. Précise avec des photos et une description détaillée, les défauts de ton article.",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 3,
+                    "title": "Bon état",
+                    "group_title": null,
+                    "description": "Article porté/utilisé quelques fois, présentant des imperfections et des signes d’usure. Précise avec des photos et une description détaillée, les défauts de ton article.",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 4,
+                    "title": "Satisfaisant",
+                    "group_title": null,
+                    "description": "Article porté/utilisé plusieurs fois, présentant des imperfections et des signes d’usure. Précise avec des photos et une description détaillée, les défauts de ton article.",
+                    "type": "default",
+                    "has_children": false
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "code": "color",
+          "value_ids": null,
+          "value": null,
+          "configuration": null
+        },
+        {
+          "id": 8,
+          "code": "material",
+          "value_ids": null,
+          "value": null,
+          "configuration": {
+            "title": "Matériau (recommandé)",
+            "description": null,
+            "placeholder": "Sélectionne jusqu'à %{count} options",
+            "field_placeholder": "Sélectionne un matériau",
+            "validation_error_message": "Merci de sélectionner une matière",
+            "display_type": "list",
+            "selection_type": "multi",
+            "selection_limit": 3,
+            "sorting_order": null,
+            "required": false,
+            "banner": null,
+            "options": [
+              {
+                "id": 1,
+                "title": "Matière",
+                "group_title": null,
+                "type": "group",
+                "options": [
+                  {
+                    "id": 468,
+                    "title": "Acier",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 149,
+                    "title": "Acrylique",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 122,
+                    "title": "Alpaga",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 461,
+                    "title": "Argent",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 440,
+                    "title": "Bambou",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 467,
+                    "title": "Bois",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 123,
+                    "title": "Cachemire",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 301,
+                    "title": "Caoutchouc",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 442,
+                    "title": "Carton",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 44,
+                    "title": "Coton",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 43,
+                    "title": "Cuir",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 447,
+                    "title": "Cuir synthétique",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 305,
+                    "title": "Cuir verni",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 443,
+                    "title": "Céramique",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 298,
+                    "title": "Daim",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 303,
+                    "title": "Denim",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 455,
+                    "title": "Dentelle",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 445,
+                    "title": "Duvet",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 446,
+                    "title": "Fausse fourrure",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 448,
+                    "title": "Feutre",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 451,
+                    "title": "Flanelle",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 454,
+                    "title": "Jute",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 46,
+                    "title": "Laine",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 302,
+                    "title": "Latex",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 146,
+                    "title": "Lin",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 456,
+                    "title": "Maille",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 152,
+                    "title": "Mohair",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 449,
+                    "title": "Mousse",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 444,
+                    "title": "Mousseline",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 121,
+                    "title": "Mérinos",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 457,
+                    "title": "Métal",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 52,
+                    "title": "Nylon",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 178,
+                    "title": "Néoprène",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 453,
+                    "title": "Or",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 463,
+                    "title": "Paille",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 458,
+                    "title": "Papier",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 177,
+                    "title": "Peluche",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 462,
+                    "title": "Pierre",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 300,
+                    "title": "Plastique",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 120,
+                    "title": "Polaire",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 45,
+                    "title": "Polyester",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 459,
+                    "title": "Porcelaine",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 460,
+                    "title": "Rotin",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 311,
+                    "title": "Satin",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 226,
+                    "title": "Sequin",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 470,
+                    "title": "Silicone",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 49,
+                    "title": "Soie",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 441,
+                    "title": "Toile",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 464,
+                    "title": "Tulle",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 465,
+                    "title": "Tweed",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 466,
+                    "title": "Velours",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 299,
+                    "title": "Velours côtelé",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 452,
+                    "title": "Verre",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 48,
+                    "title": "Viscose",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  },
+                  {
+                    "id": 53,
+                    "title": "Élasthanne",
+                    "group_title": null,
+                    "description": "",
+                    "type": "default",
+                    "has_children": false
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

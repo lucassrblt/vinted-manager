@@ -1,0 +1,372 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "https://api.vinted.fr/messaging/main/inbox"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "conversations": [
+        {
+          "conversation_type": "inquiry",
+          "created_at": "2026-10-25T10:28:34Z",
+          "data": {
+            "inventory_items": [
+              {
+                "id": "10475120267",
+                "photos": [
+                  {
+                    "dominant_color_opaque": "#E5E7EA",
+                    "full_size_url": "https://images1.vinted.net/tc/06_0122f_9gTm99QEjb7p6874cfDBxABG/f3f1b1d3.webp?s=87e84469b7e59cf4b96259f25b9a10c288cf594f",
+                    "height": 800,
+                    "image_no": 1,
+                    "thumbnails": [
+                      {
+                        "height": 100,
+                        "url": "https://images1.vinted.net/t/06_0122f_9gTm99QEjb7p6874cfDBxABG/70x100/f3f1b1d3.webp?s=4d3f844d313caf855769c9671aeefc86e9439189",
+                        "width": 70
+                      },
+                      {
+                        "height": 210,
+                        "url": "https://images1.vinted.net/t/06_0122f_9gTm99QEjb7p6874cfDBxABG/150x210/f3f1b1d3.webp?s=3aa3d9a5c5636a18f519f366a656ee4b9781c1df",
+                        "width": 150
+                      },
+                      {
+                        "height": 430,
+                        "url": "https://images1.vinted.net/t/06_0122f_9gTm99QEjb7p6874cfDBxABG/310x430/f3f1b1d3.webp?s=b55adefc5f3a9e72bd7bc54267a560599c0c80e0",
+                        "width": 310
+                      },
+                      {
+                        "height": 624,
+                        "url": "https://images1.vinted.net/t/06_0122f_9gTm99QEjb7p6874cfDBxABG/428x624/f3f1b1d3.webp?s=fcc6be4a6bb97a5abb2b2e29ca1e8c6c0f5d1027",
+                        "width": 428
+                      },
+                      {
+                        "height": 428,
+                        "url": "https://images1.vinted.net/t/06_0122f_9gTm99QEjb7p6874cfDBxABG/624x428/f3f1b1d3.webp?s=b25a168e733cbc8165f8b76c93df4237fcf867af",
+                        "width": 624
+                      },
+                      {
+                        "height": 428,
+                        "url": "https://images1.vinted.net/t/06_0122f_9gTm99QEjb7p6874cfDBxABG/364x428/f3f1b1d3.webp?s=393383db20c4051e6eb632f1fa33b818889a540d",
+                        "width": 364
+                      }
+                    ],
+                    "url": "https://images1.vinted.net/t/06_0122f_9gTm99QEjb7p6874cfDBxABG/f800/f3f1b1d3.webp?s=53ee045e19350207166b9a8dfde39127c6e9bdca",
+                    "width": 600
+                  }
+                ],
+                "title": "Sweat col rond Uniqlo gris chiné taille L"
+              }
+            ]
+          },
+          "id": "01a1729a-df35-7e50-84fc-f46b8ec2dc6a",
+          "is_deletable": true,
+          "is_unread_by_current_user": false,
+          "labels": [],
+          "last_message": {
+            "conversation_id": "01a1729a-df35-7e50-84fc-f46b8ec2dc6a",
+            "created_at": "2026-10-25T10:31:29.2Z",
+            "data": {
+              "content": "7,00 €",
+              "is_message_content_hidden": false,
+              "is_thread_event": false
+            },
+            "id": "01a1729e-4a0b-7aec-aa47-64513e4aafde",
+            "message_type": "legacy_last_message",
+            "sender_id": "0"
+          },
+          "nudges": [],
+          "opposite_users": [
+            {
+              "data": {
+                "id": "900000005",
+                "is_hated": false,
+                "is_on_holiday": false,
+                "last_logged_in_at": "2026-10-25T10:28:16Z",
+                "login_name": "membre_test_16",
+                "photo": {
+                  "dominant_color_opaque": "#DBE6F9",
+                  "full_size_url": "https://images1.vinted.net/tc/02_01829_AAT9jQSywexhKYhLeEvpMN6d/6c35d889.webp?s=7ff63796d4c09296869644cc7294fcc4960b32bc",
+                  "thumbnails": [
+                    {
+                      "height": 400,
+                      "url": "https://images1.vinted.net/t/02_01829_AAT9jQSywexhKYhLeEvpMN6d/400x400/6c35d889.webp?s=4b28a498170baa502ef4c6f8666ac596dc5a84e4",
+                      "width": 400
+                    },
+                    {
+                      "height": 200,
+                      "url": "https://images1.vinted.net/t/02_01829_AAT9jQSywexhKYhLeEvpMN6d/200x200/6c35d889.webp?s=6aeffd200a729395223780c142a062d2477ebe8c",
+                      "width": 200
+                    },
+                    {
+                      "height": 100,
+                      "url": "https://images1.vinted.net/t/02_01829_AAT9jQSywexhKYhLeEvpMN6d/100x100/6c35d889.webp?s=f1d2d32feeb4cbcf823e16ea3e334bca5cfdc76b",
+                      "width": 100
+                    },
+                    {
+                      "height": 50,
+                      "url": "https://images1.vinted.net/t/02_01829_AAT9jQSywexhKYhLeEvpMN6d/50x50/6c35d889.webp?s=bb326b57905a1f6fabb564ff2fee87e3fd84b631",
+                      "width": 50
+                    },
+                    {
+                      "height": 20,
+                      "url": "https://images1.vinted.net/t/02_01829_AAT9jQSywexhKYhLeEvpMN6d/20x20/6c35d889.webp?s=e14c7d07b2468e642d3acbc06592b6434442a238",
+                      "width": 20
+                    }
+                  ],
+                  "url": "https://images1.vinted.net/t/02_01829_AAT9jQSywexhKYhLeEvpMN6d/f800/6c35d889.webp?s=babd99fd200d700a048974f4260d2a43fd5eddc8"
+                }
+              },
+              "type": "member"
+            }
+          ],
+          "statuses": []
+        },
+        {
+          "conversation_type": "inquiry",
+          "created_at": "2026-10-23T21:21:25Z",
+          "data": {
+            "inventory_items": [
+              {
+                "id": "10475120267",
+                "photos": [
+                  {
+                    "dominant_color_opaque": "#E5E7EA",
+                    "full_size_url": "https://images1.vinted.net/tc/06_0122f_9gTm99QEjb7p6874cfDBxABG/f3f1b1d3.webp?s=87e84469b7e59cf4b96259f25b9a10c288cf594f",
+                    "height": 800,
+                    "image_no": 1,
+                    "thumbnails": [
+                      {
+                        "height": 100,
+                        "url": "https://images1.vinted.net/t/06_0122f_9gTm99QEjb7p6874cfDBxABG/70x100/f3f1b1d3.webp?s=4d3f844d313caf855769c9671aeefc86e9439189",
+                        "width": 70
+                      },
+                      {
+                        "height": 210,
+                        "url": "https://images1.vinted.net/t/06_0122f_9gTm99QEjb7p6874cfDBxABG/150x210/f3f1b1d3.webp?s=3aa3d9a5c5636a18f519f366a656ee4b9781c1df",
+                        "width": 150
+                      },
+                      {
+                        "height": 430,
+                        "url": "https://images1.vinted.net/t/06_0122f_9gTm99QEjb7p6874cfDBxABG/310x430/f3f1b1d3.webp?s=b55adefc5f3a9e72bd7bc54267a560599c0c80e0",
+                        "width": 310
+                      },
+                      {
+                        "height": 624,
+                        "url": "https://images1.vinted.net/t/06_0122f_9gTm99QEjb7p6874cfDBxABG/428x624/f3f1b1d3.webp?s=fcc6be4a6bb97a5abb2b2e29ca1e8c6c0f5d1027",
+                        "width": 428
+                      },
+                      {
+                        "height": 428,
+                        "url": "https://images1.vinted.net/t/06_0122f_9gTm99QEjb7p6874cfDBxABG/624x428/f3f1b1d3.webp?s=b25a168e733cbc8165f8b76c93df4237fcf867af",
+                        "width": 624
+                      },
+                      {
+                        "height": 428,
+                        "url": "https://images1.vinted.net/t/06_0122f_9gTm99QEjb7p6874cfDBxABG/364x428/f3f1b1d3.webp?s=393383db20c4051e6eb632f1fa33b818889a540d",
+                        "width": 364
+                      }
+                    ],
+                    "url": "https://images1.vinted.net/t/06_0122f_9gTm99QEjb7p6874cfDBxABG/f800/f3f1b1d3.webp?s=53ee045e19350207166b9a8dfde39127c6e9bdca",
+                    "width": 600
+                  }
+                ],
+                "title": "Sweat col rond Uniqlo gris chiné taille L"
+              }
+            ]
+          },
+          "id": "01a16aa3-daff-79bb-a570-c156d97cb288",
+          "is_deletable": true,
+          "is_unread_by_current_user": false,
+          "labels": [],
+          "last_message": {
+            "conversation_id": "01a16aa3-daff-79bb-a570-c156d97cb288",
+            "created_at": "2026-10-25T10:27:26.3Z",
+            "data": {
+              "content": "Bonjour n'oublie pas que tu as accepté l'offre ;)",
+              "is_message_content_hidden": false,
+              "is_thread_event": false
+            },
+            "id": "01a1729e-4a0b-7af7-b50f-7ed1a32c3426",
+            "message_type": "legacy_last_message",
+            "sender_id": "0"
+          },
+          "nudges": [],
+          "opposite_users": [
+            {
+              "data": {
+                "id": "900000014",
+                "is_hated": false,
+                "is_on_holiday": false,
+                "last_logged_in_at": "2026-10-24T16:34:58Z",
+                "login_name": "membre_test_10",
+                "photo": {
+                  "dominant_color_opaque": "#DBE6F9",
+                  "full_size_url": "https://images1.vinted.net/tc/03_01b3f_5XmXtZnzfJTcmuFRhpAcw5Li/5f10ba0d.webp?s=9089e9e16dbc45d1a74e87778b9108718e99e117",
+                  "thumbnails": [
+                    {
+                      "height": 200,
+                      "url": "https://images1.vinted.net/t/03_01b3f_5XmXtZnzfJTcmuFRhpAcw5Li/200x200/5f10ba0d.webp?s=5b1fc03ad3db55afef8ddac81348b6336a3fd8de",
+                      "width": 200
+                    },
+                    {
+                      "height": 100,
+                      "url": "https://images1.vinted.net/t/03_01b3f_5XmXtZnzfJTcmuFRhpAcw5Li/100x100/5f10ba0d.webp?s=060dd089eef94e14cd79b4327af243b04f179f82",
+                      "width": 100
+                    },
+                    {
+                      "height": 50,
+                      "url": "https://images1.vinted.net/t/03_01b3f_5XmXtZnzfJTcmuFRhpAcw5Li/50x50/5f10ba0d.webp?s=f2456c4030dae39a011ad370fd57d6ca28dabeb5",
+                      "width": 50
+                    },
+                    {
+                      "height": 20,
+                      "url": "https://images1.vinted.net/t/03_01b3f_5XmXtZnzfJTcmuFRhpAcw5Li/20x20/5f10ba0d.webp?s=088e476ebb26d83bc6801b06fcdfe3cd3042c2d7",
+                      "width": 20
+                    },
+                    {
+                      "height": 400,
+                      "url": "https://images1.vinted.net/t/03_01b3f_5XmXtZnzfJTcmuFRhpAcw5Li/400x400/5f10ba0d.webp?s=354481960fc2c9b8ac6816d4c5ee5ec7b57268f3",
+                      "width": 400
+                    }
+                  ],
+                  "url": "https://images1.vinted.net/t/03_01b3f_5XmXtZnzfJTcmuFRhpAcw5Li/f800/5f10ba0d.webp?s=9d71e4cf42a04ab6dfbfa00edec2da832dde9608"
+                }
+              },
+              "type": "member"
+            }
+          ],
+          "statuses": []
+        },
+        {
+          "conversation_type": "inquiry",
+          "created_at": "2026-10-25T10:26:09Z",
+          "data": {
+            "inventory_items": [
+              {
+                "id": "10495425715",
+                "photos": [
+                  {
+                    "dominant_color_opaque": "#DCD9EE",
+                    "full_size_url": "https://images1.vinted.net/tc/02_021ee_Rw7u4JD9KurcvmYJZmpYEXcG/3b37e6a3.webp?s=d906737f57a91e787950fd1bc1bd0368e75134c1",
+                    "height": 800,
+                    "image_no": 1,
+                    "thumbnails": [
+                      {
+                        "height": 428,
+                        "url": "https://images1.vinted.net/t/02_021ee_Rw7u4JD9KurcvmYJZmpYEXcG/364x428/3b37e6a3.webp?s=da9423955c1f57ea0f5ae0b7a113cb2d60f8f2d6",
+                        "width": 364
+                      },
+                      {
+                        "height": 100,
+                        "url": "https://images1.vinted.net/t/02_021ee_Rw7u4JD9KurcvmYJZmpYEXcG/70x100/3b37e6a3.webp?s=775e48f889a482fc55594788e991d360d259930b",
+                        "width": 70
+                      },
+                      {
+                        "height": 210,
+                        "url": "https://images1.vinted.net/t/02_021ee_Rw7u4JD9KurcvmYJZmpYEXcG/150x210/3b37e6a3.webp?s=e5f0021c955c164dcb347e338e775199d6022514",
+                        "width": 150
+                      },
+                      {
+                        "height": 430,
+                        "url": "https://images1.vinted.net/t/02_021ee_Rw7u4JD9KurcvmYJZmpYEXcG/310x430/3b37e6a3.webp?s=5578f6d04d710b1dcef2449990a8803db3967181",
+                        "width": 310
+                      },
+                      {
+                        "height": 624,
+                        "url": "https://images1.vinted.net/t/02_021ee_Rw7u4JD9KurcvmYJZmpYEXcG/428x624/3b37e6a3.webp?s=6ed21e269a2d0807e0ba6069ecc68a4632d78f43",
+                        "width": 428
+                      },
+                      {
+                        "height": 428,
+                        "url": "https://images1.vinted.net/t/02_021ee_Rw7u4JD9KurcvmYJZmpYEXcG/624x428/3b37e6a3.webp?s=98607e9ccfbac5564525b0ffd5ff58e87f8759be",
+                        "width": 624
+                      }
+                    ],
+                    "url": "https://images1.vinted.net/t/02_021ee_Rw7u4JD9KurcvmYJZmpYEXcG/f800/3b37e6a3.webp?s=208e6b578acb22c03560de6cdd58a40327d96816",
+                    "width": 600
+                  }
+                ],
+                "title": "T-shirt Nike ACG violet lavande logo taille M"
+              }
+            ]
+          },
+          "id": "01a17298-a61f-7b53-a476-34e9f20a0d70",
+          "is_deletable": true,
+          "is_unread_by_current_user": false,
+          "labels": [],
+          "last_message": {
+            "conversation_id": "01a17298-a61f-7b53-a476-34e9f20a0d70",
+            "created_at": "2026-10-25T10:26:46.3Z",
+            "data": {
+              "content": "Bonjour, merci pour ton favori !",
+              "is_message_content_hidden": false,
+              "is_thread_event": false
+            },
+            "id": "01a1729e-4a0b-7b01-a90d-31f77c823703",
+            "message_type": "legacy_last_message",
+            "sender_id": "0"
+          },
+          "nudges": [],
+          "opposite_users": [
+            {
+              "data": {
+                "id": "900000041",
+                "is_hated": false,
+                "is_on_holiday": false,
+                "last_logged_in_at": "2026-10-25T10:16:17Z",
+                "login_name": "membre_test_11",
+                "photo": {
+                  "dominant_color_opaque": "#DBE6F9",
+                  "full_size_url": "https://images1.vinted.net/tc/06_01c57_4APfCJJivAkgwvs6P5Ps3Qdv/be262d56.webp?s=5d608e10648062aaef2c43263852992bc1d6e60f",
+                  "thumbnails": [
+                    {
+                      "height": 400,
+                      "url": "https://images1.vinted.net/t/06_01c57_4APfCJJivAkgwvs6P5Ps3Qdv/400x400/be262d56.webp?s=6b32f3a524591ef8c92006b6fe8b55e86d356ef3",
+                      "width": 400
+                    },
+                    {
+                      "height": 200,
+                      "url": "https://images1.vinted.net/t/06_01c57_4APfCJJivAkgwvs6P5Ps3Qdv/200x200/be262d56.webp?s=fd50251fe732e710c5e8a39cf4fc064d71bd8013",
+                      "width": 200
+                    },
+                    {
+                      "height": 100,
+                      "url": "https://images1.vinted.net/t/06_01c57_4APfCJJivAkgwvs6P5Ps3Qdv/100x100/be262d56.webp?s=598e80a54001bcada34dceb6d4fd0714a20f2e63",
+                      "width": 100
+                    },
+                    {
+                      "height": 50,
+                      "url": "https://images1.vinted.net/t/06_01c57_4APfCJJivAkgwvs6P5Ps3Qdv/50x50/be262d56.webp?s=8d18f15f253833d97f88c12aac058908b6ae4a08",
+                      "width": 50
+                    },
+                    {
+                      "height": 20,
+                      "url": "https://images1.vinted.net/t/06_01c57_4APfCJJivAkgwvs6P5Ps3Qdv/20x20/be262d56.webp?s=deee7377fe0d2306e045c493a39d0fda52d7b0b0",
+                      "width": 20
+                    }
+                  ],
+                  "url": "https://images1.vinted.net/t/06_01c57_4APfCJJivAkgwvs6P5Ps3Qdv/f800/be262d56.webp?s=8782350114c254f454ede327864f072c63c29f47"
+                }
+              },
+              "type": "member"
+            }
+          ],
+          "statuses": []
+        }
+      ],
+      "is_served_from_search": false,
+      "pagination": {
+        "has_next": true,
+        "has_prev": false,
+        "next_cursor": "wewg9zVhj2iOa8gxqnjDKL5itcPWe0K6QNlpxScp6IvqU7dGt9S5R6MdEcoTlPCQSwuUmR7UhU1"
+      },
+      "pagination_temp": {
+        "has_next": false,
+        "has_prev": false,
+        "next_cursor": "eQT3HA60z1qYIZA3LJiGCdT"
+      }
+    }
+  }
+}

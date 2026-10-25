@@ -1,0 +1,12 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "https://api.vinted.fr/inbox-notifications/v1/notifications/unread_count"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "count": 0
+    }
+  }
+}

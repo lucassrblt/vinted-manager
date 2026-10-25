@@ -25,8 +25,13 @@ export interface PhotoArticle {
   nb_generations: number;
   cout_estime: string;
   erreur: string | null;
+  ecart_couleur: number | null;
+  couleur_validee: boolean;
   updated_at: string;
 }
+
+// Au-delà de cet écart (ΔE), la couleur de la retouche doit être validée avant le brouillon Vinted.
+const SEUIL_COULEUR = 10;
 
 interface EtatPhotos {
   photos: PhotoArticle[];
@@ -92,6 +97,25 @@ function CartePhoto({ photo, onChange }: { photo: PhotoArticle; onChange: () => 
             <AlertCircle className="mt-0.5 size-3.5 shrink-0" /> {photo.erreur}
           </p>
         )}
+        {photo.version_choisie === "genere" &&
+          photo.ecart_couleur !== null &&
+          photo.ecart_couleur > SEUIL_COULEUR &&
+          !photo.couleur_validee && (
+            <div className="space-y-1 rounded-md bg-amber-50 p-1.5 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+              <p>
+                Couleur à vérifier (écart {photo.ecart_couleur.toLocaleString("fr-FR")}) : compare avec
+                l&apos;originale.
+              </p>
+              <Button
+                size="xs"
+                variant="outline"
+                disabled={action.isPending}
+                onClick={() => action.mutate({ methode: "POST", chemin: `/photos/${photo.id}/valider-couleur` })}
+              >
+                Couleur fidèle
+              </Button>
+            </div>
+          )}
         {photo.type === "defaut" ? (
           <p className="text-xs text-muted-foreground">Photo originale, jamais retouchée.</p>
         ) : (

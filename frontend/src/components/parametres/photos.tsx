@@ -7,10 +7,12 @@ import { toast } from "sonner";
 
 import { LignesSquelette } from "@/components/commun";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 interface ParametresPhotos {
+  premiere_photo_reelle: boolean;
   modele: string;
   modeles_par_type: Record<string, string>;
   cout_article: number;
@@ -47,11 +49,14 @@ export function ParametresPhotosIa() {
   });
   const maj = (r: ParametresPhotos) => qc.setQueryData(["parametres", "photos"], r);
   const modele = useMutation({
-    mutationFn: (corps: { modele?: string; modeles_par_type?: Record<string, string> }) =>
-      api<ParametresPhotos>("/parametres/photos", { method: "PUT", body: corps }),
+    mutationFn: (corps: {
+      modele?: string;
+      modeles_par_type?: Record<string, string>;
+      premiere_photo_reelle?: boolean;
+    }) => api<ParametresPhotos>("/parametres/photos", { method: "PUT", body: corps }),
     onSuccess: (r) => {
       maj(r);
-      toast.success("Modèle enregistré");
+      toast.success("Réglage enregistré");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -83,6 +88,22 @@ export function ParametresPhotosIa() {
             Ajoute REPLICATE_API_TOKEN aux variables du serveur pour activer la retouche des photos.
           </p>
         )}
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <label htmlFor="premiere-reelle" className="text-sm font-medium">
+              Première photo réelle
+            </label>
+            <p className="text-xs text-muted-foreground">
+              Brouillons Vinted : la photo « devant » publiée est l&apos;originale (redressée, recadrée, sans
+              métadonnées), pas la retouche.
+            </p>
+          </div>
+          <Switch
+            id="premiere-reelle"
+            checked={data.premiere_photo_reelle}
+            onCheckedChange={(v) => modele.mutate({ premiere_photo_reelle: v })}
+          />
+        </div>
         <div className="space-y-3">
           <div>
             <p className="text-sm font-medium">Modèle selon le type de photo</p>
