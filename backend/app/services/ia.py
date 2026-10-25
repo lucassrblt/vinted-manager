@@ -38,6 +38,19 @@ class ReponseIA(BaseModel):
     reponse: str
 
 
+INTENTIONS = ["question", "offre_texte", "lot", "remerciement", "suspect", "autre"]
+
+
+class ReponseAssistant(BaseModel):
+    """Réponse de l'assistant à un message d'acheteur, avec sa propre évaluation du besoin d'escalade."""
+
+    intention: str = "autre"
+    reponse: str = ""
+    escalade: bool = False
+    raison_escalade: str = ""
+    montant_propose: float | None = None
+
+
 SCHEMA_ANNONCE = {
     "type": "object",
     "properties": {
@@ -50,8 +63,17 @@ SCHEMA_ANNONCE = {
 }
 SCHEMA_REPONSE = {
     "type": "object",
-    "properties": {"reponse": {"type": "string"}},
-    "required": ["reponse"],
+    "properties": {
+        "intention": {"type": "string", "enum": INTENTIONS},
+        "reponse": {"type": "string"},
+        "escalade": {"type": "boolean"},
+        "raison_escalade": {"type": "string", "description": "vide si pas d'escalade"},
+        "montant_propose": {
+            "anyOf": [{"type": "number"}, {"type": "null"}],
+            "description": "montant en euros proposé par l'acheteur dans son message, sinon null",
+        },
+    },
+    "required": ["intention", "reponse", "escalade", "raison_escalade", "montant_propose"],
     "additionalProperties": False,
 }
 
@@ -346,6 +368,48 @@ def suggerer_reponse(
         ).reponse.strip()
     except ValidationError as exc:
         raise ErreurIA("Réponse de l'IA incomplète. Réessaie.") from exc
+
+
+def repondre_acheteur(
+    messages: list[str],
+    fiche: dict[str, Any] | None,
+    ton: str = "",
+    reponses_types: list[str] | None = None,
+) -> ReponseAssistant:
+    """Réponse automatique de l'assistant : intention, texte, besoin d'escalade, montant proposé."""
+    if get_settings().ia_factice:
+        return _assistant_factice(messages)
+    contenu = "Messages de l'acheteur (du plus ancien au plus récent) :\n" + "\n".join(
+        f"- {m}" for m in messages
+    )
+    contenu += "\n\nFiche article (seules informations fiables) :\n" + (
+        _fiche_texte(fiche) if fiche else "- Article inconnu"
+    )
+    if ton:
+        contenu += f"\n\nTon souhaité par le vendeur : {ton}"
+    if reponses_types:
+        contenu += "\n\nRéponses types du vendeur :\n" + "\n".join(f"- {r}" for r in reponses_types)
+    contenu += "\n\nMode automatique : la réponse partira sans relecture si escalade = false."
+    try:
+        r = ReponseAssistant.model_validate(
+            _appeler(prompt_systeme("reponse_message"), contenu, SCHEMA_REPONSE)
+        )
+    except ValidationError as exc:
+        raise ErreurIA("Réponse de l'IA incomplète.") from exc
+    r.reponse = r.reponse.strip()
+    if r.intention not in INTENTIONS:
+        r.intention = "autre"
+    return r
+
+
+def _assistant_factice(messages: list[str]) -> ReponseAssistant:
+    texte = " ".join(messages).lower()
+    if "remerci" in texte or texte.startswith("merci"):
+        return ReponseAssistant(intention="remerciement", reponse="Avec plaisir, bonne journée !")
+    return ReponseAssistant(
+        intention="question",
+        reponse="Bonjour, oui il est toujours disponible ! N'hésite pas si tu as une question.",
+    )
 
 
 def _reponse_factice(type_message: str, decision: dict[str, Any] | None) -> str:

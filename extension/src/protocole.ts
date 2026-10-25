@@ -21,10 +21,22 @@ export interface Tache {
 export type VersContenu =
   | MessageBase<"ping", null>
   | MessageBase<"compte", null>
+  | MessageBase<"inbox", null>
+  | MessageBase<"conversation", { id: string }>
+  | MessageBase<"dressing", { user_id: number | null }>
+  | MessageBase<"surveillance", { actif: boolean; nuit: boolean }>
   | MessageBase<"executer", { tache: Tache; vinted_user_id: number | null }>;
 
+/** Compteurs de non-lus relevés par l'onglet. */
+export interface Compteurs {
+  messages: number | null;
+  notifications: number | null;
+  erreur?: string;
+  arret?: boolean;
+}
+
 // Content script → service worker
-export type VersFond = MessageBase<"photo", { photo_id: number }>;
+export type VersFond = MessageBase<"photo", { photo_id: number }> | MessageBase<"compteurs", Compteurs>;
 
 export interface Echec {
   ok: false;

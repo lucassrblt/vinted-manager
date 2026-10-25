@@ -2,7 +2,7 @@
 import { ClientBackend } from "./backend";
 import { BACKEND_DEFAUT, type Config, ETAT_INITIAL, type Etat } from "./etat";
 import { MEMOIRE_INITIALE, type Memoire, Moteur, reponseIndisponible } from "./moteur";
-import { blobVersBase64 } from "./outils";
+import { attendre, blobVersBase64 } from "./outils";
 import type { PhotoBase64, Reponse, VersContenu, VersFond } from "./protocole";
 
 const ALARME = "tick";
@@ -42,21 +42,26 @@ async function envoyer<R>(onglet: number, message: VersContenu): Promise<Reponse
 
 let enCours: Promise<void> | null = null;
 
+async function moteur(): Promise<Moteur> {
+  return new Moteur({
+    backend: await backend(),
+    ongletVinted,
+    envoyer,
+    maintenant: () => Date.now(),
+    attendre,
+    aleatoire: Math.random,
+    lireMemoire: async () =>
+      ((await chrome.storage.local.get("memoire")) as { memoire?: Memoire }).memoire ?? { ...MEMOIRE_INITIALE },
+    ecrireMemoire: (memoire) => chrome.storage.local.set({ memoire }),
+    majEtat,
+    version: chrome.runtime.getManifest().version,
+  });
+}
+
 async function tick(): Promise<void> {
   if (enCours) return; // un seul cycle à la fois
   enCours = (async () => {
-    const moteur = new Moteur({
-      backend: await backend(),
-      ongletVinted,
-      envoyer,
-      maintenant: () => Date.now(),
-      lireMemoire: async () =>
-        ((await chrome.storage.local.get("memoire")) as { memoire?: Memoire }).memoire ?? { ...MEMOIRE_INITIALE },
-      ecrireMemoire: (memoire) => chrome.storage.local.set({ memoire }),
-      majEtat,
-      version: chrome.runtime.getManifest().version,
-    });
-    await moteur.tick();
+    await (await moteur()).tick();
   })();
   try {
     await enCours;

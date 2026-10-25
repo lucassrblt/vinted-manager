@@ -1,11 +1,20 @@
 /**
  * Traitement des demandes du service worker dans l'onglet Vinted (testable sans Chrome).
  */
-import { type Attendre, base64VersBlob } from "./outils";
-import type { Echec, PhotoBase64, Reponse, ResultatCompte, Tache, VersContenu } from "./protocole";
+import { type Attendre, base64VersBlob, entre } from "./outils";
+import type { Compteurs, Echec, PhotoBase64, Reponse, ResultatCompte, Tache, VersContenu } from "./protocole";
 import { type ChargeBrouillon, creerBrouillon } from "./vinted/brouillon";
 import type { ClientVinted } from "./vinted/client";
+import { lireDressing } from "./vinted/dressing";
 import { ErreurAction, ErreurVinted } from "./vinted/erreurs";
+import {
+  accepterOffre,
+  contreOffre,
+  reduireConversation,
+  reduireInbox,
+  refuserOffre,
+  repondreMessage,
+} from "./vinted/messagerie";
 
 export interface Execution {
   client: ClientVinted;
@@ -18,6 +27,10 @@ export type Executeur = (tache: Tache, e: Execution) => Promise<Record<string, u
 
 /** Exécuteurs par type de tâche (complétés à chaque phase). */
 export const EXECUTEURS: Record<string, Executeur> = {
+  repondre_message: (t, e) => repondreMessage(t.payload, e),
+  accepter_offre: (t, e) => accepterOffre(t.payload, e),
+  refuser_offre: (t, e) => refuserOffre(t.payload, e),
+  contre_offre: (t, e) => contreOffre(t.payload, e),
   brouillon: async (tache, e) => ({
     ...(await creerBrouillon(tache.payload as unknown as ChargeBrouillon, {
       client: e.client,
@@ -29,12 +42,22 @@ export const EXECUTEURS: Record<string, Executeur> = {
 };
 
 export const CACHE_COMPTE_MS = 5 * 60_000;
+// Compteurs de non-lus : toutes les 15 à 30 s en journée, toutes les 5 min la nuit.
+export const RELEVE_JOUR_MS: [number, number] = [15_000, 30_000];
+export const RELEVE_NUIT_MS = 5 * 60_000;
+// Sans nouvelle du service worker pendant ce délai, la surveillance s'arrête d'elle-même.
+export const VALIDITE_SURVEILLANCE_MS = 2 * 60_000;
 
 export interface DependancesContenu {
   client: () => ClientVinted;
   demanderPhoto: (photoId: number) => Promise<Reponse<PhotoBase64>>;
   attendre: Attendre;
   maintenant: () => number;
+  /** Relance différée de la surveillance (setTimeout dans la page). */
+  planifier?: (fn: () => void, ms: number) => void;
+  /** Prévient le service worker d'un changement des compteurs. */
+  signaler?: (c: Compteurs) => void;
+  aleatoire?: () => number;
 }
 
 export function versReponse(e: unknown): Echec {
@@ -55,8 +78,41 @@ export function versReponse(e: unknown): Echec {
 
 export class Contenu {
   private compte: { valeur: ResultatCompte; date: number } | null = null;
+  private surveillance = { actif: false, nuit: false, jusqua: 0 };
+  private derniers: { messages: number; notifications: number } | null = null;
+  private boucle = false;
 
   constructor(private readonly d: DependancesContenu) {}
+
+  /** Un relevé des compteurs de non-lus ; prévient le service worker s'ils augmentent. */
+  async releve(): Promise<void> {
+    const s = this.surveillance;
+    if (!s.actif || this.d.maintenant() > s.jusqua) return;
+    const client = this.d.client();
+    try {
+      const [m, n] = await Promise.all([client.nonLusMessages(), client.nonLusNotifications()]);
+      const actuels = { messages: Number(m.unread_count) || 0, notifications: Number(n.count) || 0 };
+      const avant = this.derniers;
+      this.derniers = actuels;
+      if (avant && (actuels.messages > avant.messages || actuels.notifications > avant.notifications)) {
+        this.d.signaler?.(actuels);
+      }
+    } catch (e) {
+      const r = versReponse(e);
+      if (r.arret) this.d.signaler?.({ messages: null, notifications: null, erreur: r.erreur, arret: true });
+    }
+  }
+
+  private lancerBoucle(): void {
+    if (this.boucle || !this.d.planifier) return;
+    this.boucle = true;
+    const etape = async (): Promise<void> => {
+      await this.releve();
+      const delai = this.surveillance.nuit ? RELEVE_NUIT_MS : entre(...RELEVE_JOUR_MS, this.d.aleatoire);
+      this.d.planifier?.(() => void etape(), delai);
+    };
+    this.d.planifier(() => void etape(), entre(...RELEVE_JOUR_MS, this.d.aleatoire));
+  }
 
   async traiter(message: VersContenu): Promise<Reponse> {
     try {
@@ -65,6 +121,19 @@ export class Contenu {
           return { ok: true, resultat: null };
         case "compte":
           return { ok: true, resultat: await this.compteCourant() };
+        case "inbox":
+          return { ok: true, resultat: reduireInbox(await this.d.client().inbox()) };
+        case "conversation":
+          return {
+            ok: true,
+            resultat: reduireConversation(await this.d.client().conversation(message.payload.id)),
+          };
+        case "surveillance":
+          this.surveillance = { ...message.payload, jusqua: this.d.maintenant() + VALIDITE_SURVEILLANCE_MS };
+          this.lancerBoucle();
+          return { ok: true, resultat: null };
+        case "dressing":
+          return { ok: true, resultat: await lireDressing(this.d.client(), message.payload.user_id, this.d.attendre) };
         case "executer": {
           const { tache, vinted_user_id } = message.payload;
           const executeur = EXECUTEURS[tache.type];

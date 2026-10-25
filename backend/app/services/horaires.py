@@ -1,7 +1,8 @@
 """Heures actives (Europe/Paris) et délais aléatoires « humains » entre les actions sur Vinted."""
 
 import random
-from datetime import datetime, time, timedelta
+import re
+from datetime import UTC, datetime, time, timedelta
 
 from app.db import utcnow
 from app.models import CompteVinted
@@ -59,3 +60,15 @@ def delai(min_s: float, max_s: float, rng: random.Random | None = None) -> timed
 def delai_reponse(compte: CompteVinted, quand: datetime | None = None) -> timedelta:
     """Réponse à un acheteur : 20 à 60 s en journée, 5 à 15 min la nuit."""
     return delai(20, 60) if actif(compte, quand) else delai(5 * 60, 15 * 60)
+
+
+def date_vinted(texte: object) -> datetime | None:
+    """Date ISO de Vinted (« 2026-10-25T10:27:26.518581397Z ») : nanosecondes tronquées, UTC par défaut."""
+    if not isinstance(texte, str) or not texte:
+        return None
+    propre = re.sub(r"(\.\d{6})\d+", r"\1", texte.strip()).replace("Z", "+00:00")
+    try:
+        d = datetime.fromisoformat(propre)
+    except ValueError:
+        return None
+    return d if d.tzinfo else d.replace(tzinfo=UTC)

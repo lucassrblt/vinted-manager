@@ -9,6 +9,10 @@ type Gestion = (payload: never) => Reponse;
 export class ContenuSimule {
   compte: Gestion = () => ({ ok: true, resultat: { id: 3201823662, login: "jeanmekloul" } });
   executer: Gestion = () => ({ ok: false, erreur: "non prévu", arret: false, mauvais_compte: false });
+  surveillance: Gestion = () => ({ ok: true, resultat: null });
+  dressing: Gestion = () => ({ ok: true, resultat: { items: [], complet: true, total: 0 } });
+  inbox: Gestion = () => ({ ok: true, resultat: { conversations: [] } });
+  conversation: Gestion = (p: never) => ({ ok: true, resultat: { id: (p as { id: string }).id, messages: [] } });
   messages: VersContenu[] = [];
 
   repondre(m: VersContenu): Reponse {
@@ -19,14 +23,18 @@ export class ContenuSimule {
   }
 }
 
-export function environnement(o: { configure?: boolean; onglet?: number | null } = {}) {
+export function environnement(o: { configure?: boolean; onglet?: number | null; memoire?: Partial<Memoire> } = {}) {
   const backend = new FauxBackend();
   const contenu = new ContenuSimule();
   let horloge = Date.UTC(2026, 9, 25, 12, 0, 0);
-  let memoire: Memoire = { ...MEMOIRE_INITIALE };
+  // Par défaut, dressing et messagerie viennent d'être lus : les tests ciblent le reste.
+  let memoire: Memoire = { ...MEMOIRE_INITIALE, dernierDressing: horloge, derniereInbox: horloge, ...o.memoire };
+  const attentes: number[] = [];
   const sim = {
     backend,
     contenu,
+    attentes,
+    memoire: () => memoire,
     etat: { ...ETAT_INITIAL } as Etat,
     avancer(ms: number) {
       horloge += ms;
@@ -38,6 +46,10 @@ export function environnement(o: { configure?: boolean; onglet?: number | null }
     ongletVinted: async () => (o.onglet === undefined ? 7 : o.onglet),
     envoyer: async <R>(_onglet: number, m: VersContenu) => contenu.repondre(m) as Reponse<R>,
     maintenant: () => horloge,
+    attendre: async (ms) => {
+      attentes.push(ms);
+    },
+    aleatoire: () => 0.5,
     lireMemoire: async () => ({ ...memoire }),
     ecrireMemoire: async (m) => {
       memoire = { ...m };

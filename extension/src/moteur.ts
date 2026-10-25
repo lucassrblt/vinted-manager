@@ -7,24 +7,40 @@
  */
 import type { ClientBackend, CompteBackend } from "./backend";
 import type { Etat } from "./etat";
-import { nouvelId, type Reponse, type ResultatCompte, type VersContenu } from "./protocole";
+import { type Attendre, entre } from "./outils";
+import { type Compteurs, nouvelId, type Reponse, type ResultatCompte, type VersContenu } from "./protocole";
 
 export const PERIODE_HEARTBEAT_MS = 60_000;
 // Au-delà, une action « en cours » est considérée comme perdue (service worker redémarré).
 export const OCCUPATION_MAX_MS = 10 * 60_000;
+// Dressing relu toutes les 30 min (et au démarrage) ; messagerie relue au moins toutes les 5 min.
+export const PERIODE_DRESSING_MS = 30 * 60_000;
+export const PERIODE_INBOX_MS = 5 * 60_000;
+export const CONVERSATIONS_MAX = 5;
 
 export interface Memoire {
   dernierHeartbeat: number;
   occupeDepuis: number | null;
+  dernierDressing: number;
+  derniereInbox: number;
+  inboxDemandee: boolean;
 }
 
-export const MEMOIRE_INITIALE: Memoire = { dernierHeartbeat: 0, occupeDepuis: null };
+export const MEMOIRE_INITIALE: Memoire = {
+  dernierHeartbeat: 0,
+  occupeDepuis: null,
+  dernierDressing: 0,
+  derniereInbox: 0,
+  inboxDemandee: false,
+};
 
 export interface Environnement {
   backend: ClientBackend | null;
   ongletVinted(): Promise<number | null>;
   envoyer<R>(onglet: number, message: VersContenu): Promise<Reponse<R>>;
   maintenant(): number;
+  attendre: Attendre;
+  aleatoire(): number;
   lireMemoire(): Promise<Memoire>;
   ecrireMemoire(m: Memoire): Promise<void>;
   majEtat(partiel: Partial<Etat>): Promise<void>;
@@ -84,6 +100,25 @@ export class Moteur {
     compte ??= await backend.compte();
     await this.afficherCompte(compte);
     if (compte.pause || !compte.automatisation_active) return;
+    // L'onglet relève les compteurs de non-lus tant qu'il reçoit cette consigne (toutes les 30 s).
+    await env.envoyer(onglet, {
+      type: "surveillance",
+      id: nouvelId(),
+      payload: { actif: true, nuit: !compte.heures_actives },
+    });
+    if (env.maintenant() - memoire.dernierDressing >= PERIODE_DRESSING_MS) {
+      memoire.dernierDressing = env.maintenant();
+      await this.lireDressing(backend, onglet, compte);
+      return; // une lecture lourde par réveil
+    }
+    if (
+      compte.modules.assistant !== false &&
+      (memoire.inboxDemandee || env.maintenant() - memoire.derniereInbox >= PERIODE_INBOX_MS)
+    ) {
+      memoire.inboxDemandee = false;
+      memoire.derniereInbox = env.maintenant();
+      if (!(await this.lireMessagerie(backend, onglet, compte))) return;
+    }
     const tache = await backend.tacheSuivante();
     if (!tache) return;
     memoire.occupeDepuis = env.maintenant();
@@ -110,6 +145,62 @@ export class Moteur {
     } finally {
       memoire.occupeDepuis = null;
     }
+  }
+
+  /** Compteurs de non-lus en hausse (ou erreur) signalés par l'onglet. */
+  async compteurs(c: Compteurs): Promise<void> {
+    const memoire = { ...MEMOIRE_INITIALE, ...(await this.env.lireMemoire()) };
+    memoire.inboxDemandee = true;
+    await this.env.ecrireMemoire(memoire);
+    if (c.arret && c.erreur && this.env.backend) {
+      const compte = await this.env.backend.compte();
+      if (!compte.pause) await this.env.backend.arret(c.erreur);
+    }
+  }
+
+  /** Réponse d'une lecture : en cas d'échec inattendu (401, 403…), arrêt du compte. */
+  private async lecture<R>(
+    backend: ClientBackend,
+    compte: CompteBackend,
+    onglet: number,
+    message: VersContenu,
+  ): Promise<R | null> {
+    const r = await this.env.envoyer<R>(onglet, message);
+    if (r.ok) return r.resultat;
+    if (r.arret && !compte.pause) await backend.arret(r.erreur);
+    await this.action(`Lecture impossible : ${r.erreur}`);
+    return null;
+  }
+
+  private async lireDressing(backend: ClientBackend, onglet: number, compte: CompteBackend): Promise<void> {
+    const r = await this.lecture<Record<string, unknown>>(backend, compte, onglet, {
+      type: "dressing",
+      id: nouvelId(),
+      payload: { user_id: compte.vinted_user_id },
+    });
+    if (r) await backend.evenement("dressing", r);
+  }
+
+  /** Inbox → le backend dit quelles conversations lire → chacune lui est transmise. Faux si arrêt. */
+  private async lireMessagerie(backend: ClientBackend, onglet: number, compte: CompteBackend): Promise<boolean> {
+    const inbox = await this.lecture<Record<string, unknown>>(backend, compte, onglet, {
+      type: "inbox",
+      id: nouvelId(),
+      payload: null,
+    });
+    if (!inbox) return false;
+    const { a_lire } = await backend.evenement<{ a_lire?: string[] }>("inbox", inbox);
+    for (const id of (a_lire ?? []).slice(0, CONVERSATIONS_MAX)) {
+      await this.env.attendre(entre(2000, 4000, this.env.aleatoire));
+      const conversation = await this.lecture<Record<string, unknown>>(backend, compte, onglet, {
+        type: "conversation",
+        id: nouvelId(),
+        payload: { id },
+      });
+      if (!conversation) return false;
+      await backend.evenement("conversation", conversation);
+    }
+    return true;
   }
 
   private async afficherCompte(compte: CompteBackend): Promise<void> {

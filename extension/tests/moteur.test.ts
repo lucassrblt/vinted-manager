@@ -109,3 +109,82 @@ describe("service worker", () => {
     expect(sim.contenu.executer).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("surveillance de Vinted", () => {
+  it("consigne de surveillance envoyée à l'onglet à chaque réveil (cadence de nuit hors heures actives)", async () => {
+    const sim = environnement();
+    sim.backend.compte.heures_actives = false;
+    await sim.moteur.tick();
+    expect(sim.contenu.messages.find((m) => m.type === "surveillance")?.payload).toEqual({ actif: true, nuit: true });
+  });
+
+  it("dressing lu au démarrage puis toutes les 30 min, transmis tel quel au backend", async () => {
+    const sim = environnement({ memoire: { dernierDressing: 0 } });
+    await sim.moteur.tick();
+    expect(sim.contenu.messages.find((m) => m.type === "dressing")?.payload).toEqual({ user_id: 3201823662 });
+    expect(sim.backend.appels.find((a) => a.chemin === "/evenements")?.corps).toEqual({
+      type: "dressing",
+      donnees: { items: [], complet: true, total: 0 },
+    });
+    expect(sim.backend.chemins()).not.toContain("GET /taches/suivante"); // une lecture lourde par réveil
+    sim.avancer(29 * 60_000);
+    await sim.moteur.tick();
+    expect(sim.contenu.messages.filter((m) => m.type === "dressing")).toHaveLength(1);
+    sim.avancer(60_000);
+    await sim.moteur.tick();
+    expect(sim.contenu.messages.filter((m) => m.type === "dressing")).toHaveLength(2);
+  });
+
+  it("compteurs en hausse : messagerie lue, conversations demandées par le backend transmises", async () => {
+    const sim = environnement();
+    sim.backend.aLire = ["c1", "c2"];
+    await sim.moteur.compteurs({ messages: 3, notifications: 0 });
+    await sim.moteur.tick();
+    const evenements = sim.backend.appels.filter((a) => a.chemin === "/evenements").map((a) => a.corps);
+    expect(evenements).toEqual([
+      { type: "inbox", donnees: { conversations: [] } },
+      { type: "conversation", donnees: { id: "c1", messages: [] } },
+      { type: "conversation", donnees: { id: "c2", messages: [] } },
+    ]);
+    expect(sim.attentes).toEqual([3000, 3000]); // 2 à 4 s entre deux lectures
+    expect(sim.backend.chemins()).toContain("GET /taches/suivante");
+  });
+
+  it("messagerie relue toutes les 5 min même sans compteur, sauf si l'assistant est coupé", async () => {
+    const sim = environnement();
+    sim.avancer(5 * 60_000);
+    await sim.moteur.tick();
+    expect(sim.contenu.messages.filter((m) => m.type === "inbox")).toHaveLength(1);
+    sim.backend.compte.modules = { ...sim.backend.compte.modules, assistant: false };
+    sim.avancer(5 * 60_000);
+    await sim.moteur.tick();
+    expect(sim.contenu.messages.filter((m) => m.type === "inbox")).toHaveLength(1);
+  });
+
+  it("compte en pause : aucune lecture de Vinted", async () => {
+    const sim = environnement({ memoire: { dernierDressing: 0, derniereInbox: 0 } });
+    sim.backend.compte.pause = true;
+    await sim.moteur.tick();
+    expect(sim.contenu.messages.map((m) => m.type)).toEqual(["compte"]);
+  });
+
+  it("erreur 403 pendant une lecture : arrêt du compte", async () => {
+    const sim = environnement({ memoire: { derniereInbox: 0 } });
+    sim.contenu.inbox = () => ({
+      ok: false,
+      erreur: "Vinted a refusé l'accès (403)",
+      arret: true,
+      mauvais_compte: false,
+    });
+    await sim.moteur.tick();
+    expect(sim.backend.chemins()).toContain("POST /arret");
+    expect(sim.backend.chemins()).not.toContain("GET /taches/suivante");
+  });
+
+  it("captcha signalé par les compteurs : arrêt", async () => {
+    const sim = environnement();
+    await sim.moteur.compteurs({ messages: null, notifications: null, erreur: "Captcha Vinted détecté", arret: true });
+    expect(sim.backend.chemins()).toEqual(["GET /compte", "POST /arret"]);
+    expect(sim.memoire().inboxDemandee).toBe(true);
+  });
+});

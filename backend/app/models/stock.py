@@ -77,6 +77,11 @@ class Article(TimestampMixin, Base):
     prix_initial: Mapped[Decimal | None] = mapped_column(Money)  # première publication ou import
     prix_plancher: Mapped[Decimal | None] = mapped_column(Money)  # 82 % du prix initial
     importe_vinted: Mapped[bool] = mapped_column(default=False, server_default="false")
+    # Dernière lecture du dressing Vinted : photos publiées (URL), vues, favoris.
+    vinted_photos: Mapped[list[str] | None] = mapped_column(JSON)
+    vinted_vues: Mapped[int | None]
+    vinted_favoris: Mapped[int | None]
+    vinted_vu_le: Mapped[datetime | None]
     updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)
 
     batch: Mapped[Batch | None] = relationship(back_populates="articles")

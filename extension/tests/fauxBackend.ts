@@ -31,6 +31,7 @@ export class FauxBackend {
   appels: AppelBackend[] = [];
   routes = new Map<string, Gestionnaire>();
   compte: CompteBackend = { ...COMPTE };
+  aLire: string[] = [];
 
   constructor() {
     this.sur("GET /compte", () => ({ body: this.compte }));
@@ -44,6 +45,9 @@ export class FauxBackend {
     this.sur("GET /brouillons/suivant", () => ({ status: 204 }));
     this.sur("GET /taches/suivante", () => ({ status: 204 }));
     this.sur("POST /taches/{n}/resultat", () => ({ status: 204 }));
+    this.sur("POST /evenements", (c) => ({
+      body: (c as { type: string }).type === "inbox" ? { a_lire: this.aLire } : { ok: true },
+    }));
   }
 
   sur(cle: string, g: Gestionnaire): this {

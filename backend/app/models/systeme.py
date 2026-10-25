@@ -135,6 +135,8 @@ class CompteVinted(TimestampMixin, Base):
     telegram_code_expire_le: Mapped[datetime | None]
     # Surveillance : alertes « hors ligne » et « onglet fermé » déjà envoyées (une seule fois).
     onglet_ferme_depuis: Mapped[datetime | None]
+    # Première lecture de la messagerie : rien d'antérieur n'est traité par l'assistant.
+    inbox_initialise_le: Mapped[datetime | None]
     alerte_hors_ligne_le: Mapped[datetime | None]
     alerte_onglet_le: Mapped[datetime | None]
 
@@ -186,3 +188,26 @@ class TacheVinted(Base):
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
     debut_le: Mapped[datetime | None]
     fin_le: Mapped[datetime | None]
+
+
+class ConversationVinted(Base):
+    """Conversation de la messagerie Vinted suivie par l'assistant, avec son point de reprise."""
+
+    __tablename__ = "conversation_vinted"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)  # UUID Vinted
+    compte_id: Mapped[int] = mapped_column(ForeignKey("compte_vinted.id", ondelete="CASCADE"), index=True)
+    article_id: Mapped[int | None] = mapped_column(ForeignKey("article.id", ondelete="SET NULL"), index=True)
+    vinted_item_ids: Mapped[list[int] | None] = mapped_column(JSON)
+    transaction_id: Mapped[int | None] = mapped_column(BigInteger)
+    interlocuteur_id: Mapped[int | None] = mapped_column(BigInteger)
+    interlocuteur_login: Mapped[str | None] = mapped_column(String(120))
+    # Dernier message échangé (dans un sens ou dans l'autre) : la republication attend 1 h après.
+    dernier_message_le: Mapped[datetime | None] = mapped_column(index=True)
+    # Point de reprise : messages traités jusqu'à cette date, et leurs identifiants (jamais deux fois).
+    dernier_traite_le: Mapped[datetime | None]
+    messages_vus: Mapped[list[str] | None] = mapped_column(JSON)
+    # Négociation : dernière contre-offre envoyée, et plancher déjà renvoyé une fois.
+    dernier_propose: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    plancher_renvoye: Mapped[bool] = mapped_column(default=False, server_default="false")
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)

@@ -4,7 +4,7 @@ La décision est calculée ici (règle de marge minimale), l'IA ne fait que réd
 """
 
 from dataclasses import dataclass
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_CEILING, ROUND_HALF_UP, Decimal
 
 from app.models import Article, Parametres
 from app.services import calculs, stats
@@ -79,4 +79,89 @@ def analyser(article: Article, montant: Decimal, params: Parametres) -> AnalyseO
         "contre_proposer",
         propose,
         f"Contre-proposition à {euros(propose)} (minimum {euros(mini)} pour un coefficient de {calculs.nombre_fr(params.coefficient_min)}).",
+    )
+
+
+# --- Offres reçues sur Vinted, traitées automatiquement par l'assistant (section 8) -----------
+
+CINQUANTE_CENTIMES = Decimal("0.5")
+
+
+def arrondi_50(v: Decimal, rounding: str = ROUND_HALF_UP) -> Decimal:
+    """Montant arrondi aux 50 centimes."""
+    return ((v * 2).quantize(Decimal("1"), rounding=rounding) / 2).quantize(Decimal("0.01"))
+
+
+def plancher_vinted(prix_initial: Decimal, part_pct: Decimal | int | float) -> Decimal:
+    """Jamais d'accord sous ce prix : `part_pct` % du prix initial, arrondi aux 50 centimes au-dessus."""
+    return arrondi_50(prix_initial * Decimal(str(part_pct)) / 100, ROUND_CEILING)
+
+
+@dataclass
+class DecisionVinted:
+    action: str  # accepter | refuser | contre | escalade
+    montant: Decimal | None  # contre-offre envoyée (ou montant accepté)
+    plancher: Decimal
+    explication: str
+    renvoi_plancher: bool = False  # contre-offre identique à la précédente, envoyée une seule fois
+
+
+def decider_vinted(
+    offre: Decimal,
+    prix_affiche: Decimal,
+    prix_initial: Decimal | None,
+    dernier_propose: Decimal | None,
+    plancher_deja_renvoye: bool,
+    seuil_acceptation_pct: float = 90,
+    seuil_refus_pct: float = 50,
+    plancher_pct: float = 82,
+) -> DecisionVinted:
+    """Règles déterministes (jamais l'IA) :
+
+    - accepter si l'offre atteint 90 % du prix affiché, ou la dernière contre-offre envoyée ;
+    - refuser poliment sous 50 % du prix affiché (offre jugée non sérieuse) ;
+    - sinon contre-proposer à mi-chemin entre l'offre et la dernière proposition, arrondi aux 50 centimes,
+      jamais sous le plancher (82 % du prix initial) ni au-dessus de la proposition précédente ;
+    - déjà au plancher : la même valeur est renvoyée une seule fois, puis Lucas décide (escalade).
+    """
+    plancher = plancher_vinted(prix_initial or prix_affiche, plancher_pct)
+    dernier = dernier_propose if dernier_propose is not None else prix_affiche
+    seuil = prix_affiche * Decimal(str(seuil_acceptation_pct)) / 100
+    if offre >= seuil or offre >= dernier:
+        return DecisionVinted(
+            "accepter",
+            offre,
+            plancher,
+            f"Offre de {euros(offre)} acceptée (≥ {euros(seuil)} ou ≥ dernière proposition).",
+        )
+    if offre < prix_affiche * Decimal(str(seuil_refus_pct)) / 100:
+        return DecisionVinted(
+            "refuser",
+            None,
+            plancher,
+            f"Offre de {euros(offre)} sous {seuil_refus_pct:g} % du prix affiché : refusée.",
+        )
+    contre = min(max(plancher, arrondi_50((offre + dernier) / 2)), dernier)
+    if contre <= offre:
+        return DecisionVinted(
+            "accepter",
+            offre,
+            plancher,
+            f"La contre-offre ({euros(contre)}) ne dépasserait pas l'offre : acceptée.",
+        )
+    if contre >= dernier:
+        if plancher_deja_renvoye:
+            return DecisionVinted(
+                "escalade", None, plancher,
+                f"Offre de {euros(offre)} : on est déjà au plancher ({euros(plancher)}), proposé deux fois.",
+            )  # fmt: skip
+        return DecisionVinted(
+            "contre",
+            dernier,
+            plancher,
+            f"Plancher atteint : {euros(dernier)} renvoyé une dernière fois.",
+            True,
+        )
+    return DecisionVinted(
+        "contre", contre, plancher, f"Contre-offre à {euros(contre)} (plancher {euros(plancher)})."
     )

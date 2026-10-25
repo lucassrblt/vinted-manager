@@ -14,6 +14,9 @@ const contenu = new Contenu({
     >,
   attendre,
   maintenant: () => Date.now(),
+  planifier: (fn, ms) => void setTimeout(fn, ms),
+  signaler: (compteurs) => void chrome.runtime.sendMessage({ type: "compteurs", id: nouvelId(), payload: compteurs }),
+  aleatoire: Math.random,
 });
 
 chrome.runtime.onMessage.addListener((message: VersContenu, _expediteur, repondre) => {

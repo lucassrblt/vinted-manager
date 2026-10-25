@@ -141,14 +141,15 @@ def annuler_en_attente(db: Session) -> None:
     db.info.pop(CLE, None)
 
 
-def boutons_tache(tache_id: int) -> list[list[dict[str, str]]]:
-    return [
-        [
-            {"text": "✅ Envoyer", "callback_data": f"t:{tache_id}:envoyer"},
-            {"text": "✏️ Modifier", "callback_data": f"t:{tache_id}:modifier"},
-            {"text": "🚫 Ignorer", "callback_data": f"t:{tache_id}:ignorer"},
-        ]
-    ]
+def boutons_tache(tache_id: int, envoyer: bool = True, modifier: bool = True) -> list[list[dict[str, str]]]:
+    """Envoyer la réponse proposée, la modifier, ou ignorer."""
+    ligne = []
+    if envoyer:
+        ligne.append({"text": "✅ Envoyer", "callback_data": f"t:{tache_id}:envoyer"})
+    if modifier:
+        ligne.append({"text": "✏️ Modifier", "callback_data": f"t:{tache_id}:modifier"})
+    ligne.append({"text": "🚫 Ignorer", "callback_data": f"t:{tache_id}:ignorer"})
+    return [ligne]
 
 
 # --- Appairage --------------------------------------------------------------------------------
@@ -298,6 +299,8 @@ def _decider(db: Session, params: Parametres, chat_id: str, tache: TacheVinted, 
     compte = db.get(CompteVinted, tache.compte_id)
     assert compte is not None
     if action == "envoyer":
+        if tache.type == "repondre_message" and not str(tache.payload.get("texte") or "").strip():
+            return "Aucune réponse proposée : utilise Modifier."
         file_vinted.valider_tache(db, compte, tache)
         alertes.journaliser(db, compte, "validation", f"Réponse validée sur Telegram (tâche {tache.id}).")
         return "Envoi programmé."

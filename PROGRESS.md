@@ -399,3 +399,59 @@ déployé. `main` n'a pas été touchée ; la branche vit dans un worktree sépa
    téléphone de la personne concernée (ta sœur pour son compte).
 3. Envoyer `/etat`, puis `/stop` et vérifier que la popup de l'extension passe en pause ; `/reprendre`.
 4. Fermer Chrome 6 minutes : une alerte « hors ligne » doit arriver, puis « de nouveau en ligne » à la réouverture.
+
+## Phase 3 : assistant (messages et offres reçues) ✅
+
+### Fait
+- **Lecture du dressing** (`services/dressing.py`, événement `dressing`) toutes les 30 min et au démarrage, toutes
+  les pages : rattachement par `vinted_item_id`, brouillon publié (même identifiant), titre exact, puis recherche
+  floue des mails (marque et taille contrôlées) ; sinon article « importé de Vinted » (en ligne, signalé). Prix
+  affiché, `prix_initial`, plancher, vues, favoris et URL des photos enregistrés ; un article « reçu à publier »
+  passe en ligne. Brouillons ignorés.
+- **Surveillance de la messagerie** : l'onglet relève les compteurs de non-lus toutes les 15 à 30 s (5 min la nuit)
+  et prévient le service worker quand ils augmentent ; la messagerie est aussi relue toutes les 5 min par sécurité.
+  Le backend garde le point de reprise par conversation (date et identifiants des messages traités) et répond quelles
+  conversations lire (5 au plus par passage).
+- **Offres reçues** (`offres.decider_vinted`, règles déterministes) : acceptation dès 90 % du prix affiché ou au
+  niveau de la dernière proposition ; refus sous 50 % avec message poli de l'IA ; sinon contre-offre à mi-chemin,
+  arrondie aux 50 centimes, jamais sous le plancher (82 % du prix initial) ni au-dessus de la précédente ; au plancher,
+  renvoyé une fois puis escalade Telegram (Envoyer = accepter / Ignorer).
+- **Messages** : réponse de l'IA d'après la fiche seule (prompt et schéma étendus : intention, réponse, escalade,
+  raison, montant proposé). Escalade (tâche « à valider » + Telegram avec Envoyer / Modifier / Ignorer) si l'IA a un
+  doute, si l'intention est lot ou suspect, et **toujours** (filet de sécurité sans l'IA) pour paiement ou contact
+  hors Vinted, litige ou retour, lot, mesures absentes de la fiche, article non rattaché, IA indisponible.
+  Prix proposé dans un message → mêmes règles, réponse par une offre vendeur ou par un texte de refus.
+- **Délais** : 20 à 60 s en journée, 5 à 15 min la nuit. Un nouveau message remplace la réponse en attente ; une
+  réponse faite à la main sur Vinted l'annule.
+- **Extension** : exécuteurs `repondre_message` (nouvelle API de messagerie), `accepter_offre`, `refuser_offre`
+  (refus puis message 3 à 8 s après), `contre_offre` (limites `seller_options` vérifiées avant l'envoi) ; lectures
+  réduites au nécessaire avant d'être transmises (ni photos ni avatars).
+
+### Tests
+- Backend : 32 nouveaux tests (`tests/test_assistant.py`) sur les captures réelles (inbox, conversation, dressing) :
+  table des règles d'offre, négociation complète jusqu'à l'escalade, acceptation, refus, offres déjà traitées,
+  réponses, 5 cas d'escalade obligatoire, escalade demandée par l'IA, prix dans un message, IA indisponible, nuit,
+  remplacement et annulation des réponses, article inconnu, mémorisation de la dernière contre-offre, dressing.
+  258 tests au total. Migration `e1c5a8b3d702` vérifiée.
+- Extension : 55 tests (lectures réduites, pagination du dressing, réponse, acceptation, refus + message, contre-offre
+  dans et hors limites, mauvais compte, compteurs de non-lus, orchestration du service worker).
+
+### Décisions prises (phase 3)
+- **Première lecture de la messagerie** : rien d'antérieur n'est traité (aucune réponse à d'anciens messages).
+- **Offre et texte dans le même passage** : l'offre est traitée, le texte n'appelle pas de réponse séparée (une seule
+  action vers l'acheteur).
+- **Offre acceptée par contre-offre** (prix proposé dans un message) : offre vendeur au montant demandé, sans texte.
+- **Contre-offre** : envoyée seule (Vinted l'affiche dans la conversation), sans message en plus.
+- **Message de refus** : rédigé par l'IA ; si l'IA est indisponible, texte fixe poli.
+- **Aucune lecture de Vinted quand le compte est en pause** ou l'automatisation coupée ; la surveillance des non-lus
+  s'arrête d'elle-même 2 min après la dernière consigne du service worker.
+- **Dressing** : une annonce fermée (vendue) sans article correspondant n'est pas importée ; le prix et le statut ne
+  sont mis à jour que pour un article reçu ou en ligne ; une disparition n'est déduite que d'une lecture complète.
+- Montants envoyés à Vinted au format « 6.5 » (point décimal, sans zéro inutile).
+
+### À tester toi-même (phase 3, compte secondaire)
+1. Laisser tourner l'extension, puis depuis un autre compte : envoyer un message simple (« toujours dispo ? ») →
+   réponse automatique en 20 à 60 s ; un message avec « PayPal » → alerte Telegram avec les boutons.
+2. Faire une offre à 50 % puis à 70 % du prix → refus poli, puis contre-offre ; vérifier les montants.
+3. Vérifier dans Paramètres → Automatisation → Journal que les annonces du dressing sont rattachées ou importées
+   (et compléter le coût d'achat des articles importés).
