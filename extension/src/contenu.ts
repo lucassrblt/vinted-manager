@@ -14,6 +14,7 @@ import { type ChargeRepublication, ErreurPartielle, republier } from "./vinted/r
 import {
   accepterOffre,
   contreOffre,
+  messageApresVente,
   reduireConversation,
   reduireInbox,
   refuserOffre,
@@ -37,6 +38,7 @@ export const EXECUTEURS: Record<string, Executeur> = {
   refuser_offre: (t, e) => refuserOffre(t.payload, e),
   contre_offre: (t, e) => contreOffre(t.payload, e),
   modifier_prix: (t, e) => modifierPrix(t.payload, e),
+  message_apres_vente: (t, e) => messageApresVente(t.payload, e),
   republication: (t, e) =>
     republier(t.payload as unknown as ChargeRepublication, {
       client: e.client,

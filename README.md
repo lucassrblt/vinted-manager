@@ -52,6 +52,10 @@ cp ~/Downloads/"Suivi revente Vinted.xlsx" tests/data/suivi-revente.xlsx   # non
 uv run pytest
 uv run ruff check . && uv run ruff format --check . && uv run mypy app
 
+# Extension Chrome
+cd extension
+npm install && npm test && npm run typecheck && npm run lint && npm run build
+
 # Frontend
 cd frontend
 npm run lint && npm run typecheck && npm test
@@ -156,3 +160,20 @@ cd backend && uv run pytest tests/test_classifieur.py -v
 ```
 
 Les règles s'ajustent ensuite dans l'app (**Règles des mails**) ou dans `backend/app/seed/regles.py` pour les règles par défaut.
+
+### Extension Chrome (automatisation Vinted)
+
+L'extension (`extension/`) exécute sur Vinted ce que décide vinted-manager : brouillons, réponses aux messages et
+aux offres, relances des favoris, republications, baisses de prix, remerciements après vente. Un profil Chrome par
+compte Vinted, chacun avec son jeton. Détails et décisions : `SPEC_EXTENSION.md` et `PROGRESS.md`.
+
+1. `cd extension && npm install && npm run build`.
+2. Chrome → `chrome://extensions` → mode développeur → « Charger l'extension non empaquetée » → `extension/dist`.
+3. vinted-manager → Paramètres → Automatisation → « Générer un jeton d'extension » ; dans les options de l'extension,
+   saisir l'URL du backend et ce jeton.
+4. Ouvrir www.vinted.fr dans ce profil, puis confirmer le compte vu par l'extension (« C'est bien ce compte »).
+5. Telegram (facultatif) : `TELEGRAM_BOT_TOKEN` dans les variables du backend, puis « Relier Telegram » et
+   `/start <code>` au bot.
+
+Arrêt d'urgence : interrupteur général dans Paramètres → Automatisation, `/stop` sur Telegram, ou bouton Pause de
+l'extension.

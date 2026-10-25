@@ -24,6 +24,7 @@ from app.services import (
     reglages,
     storage,
 )
+from app.services import apres_vente as _apres_vente  # noqa: F401  (ventes confirmées par le dressing)
 from app.services import assistant as _assistant  # noqa: F401  (enregistre ses événements et résultats)
 from app.services import baisse_prix as _baisse_prix  # noqa: F401  (résultat des baisses de prix)
 from app.services import dressing as _dressing  # noqa: F401  (enregistre l'événement « dressing »)

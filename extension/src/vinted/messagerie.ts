@@ -2,7 +2,7 @@
  * Messagerie et offres reçues (section 13.3) : lectures pour le backend, exécution de ses décisions.
  * Les données transmises au backend sont réduites au nécessaire (pas de photos ni d'URL d'avatar).
  */
-import { type Attendre, entre } from "../outils";
+import { type Attendre, entre, normaliser } from "../outils";
 import type { ClientVinted, Conversation, Inbox } from "./client";
 import { verifierCompte } from "./compte";
 import { ErreurAction, ErreurVinted } from "./erreurs";
@@ -141,4 +141,35 @@ export async function envoyerOffre(
 export async function contreOffre(p: Record<string, unknown>, e: ContexteAction): Promise<Record<string, unknown>> {
   await verifierCompte(e.client, e.vintedUserId);
   return envoyerOffre(identifiant(p, "transaction_id"), texte(p, "montant"), e);
+}
+
+/**
+ * Remerciement après une vente : conversation de la messagerie dont `inventory_items` contient l'annonce
+ * vendue, et dont l'interlocuteur est l'acheteur du mail quand il est connu. Introuvable ou ambiguë : rien.
+ */
+export async function messageApresVente(
+  p: Record<string, unknown>,
+  e: ContexteAction,
+): Promise<Record<string, unknown>> {
+  await verifierCompte(e.client, e.vintedUserId);
+  const article = identifiant(p, "item_id");
+  const acheteur = typeof p.acheteur === "string" && p.acheteur.trim() ? normaliser(p.acheteur) : null;
+  const { conversations } = await e.client.inbox();
+  let candidates = (conversations ?? []).filter((c) =>
+    (c.data?.inventory_items ?? []).some((i) => String(i.id) === article),
+  );
+  if (acheteur) {
+    candidates = candidates.filter((c) =>
+      (c.opposite_users ?? []).some((u) => normaliser(u.data?.login_name) === acheteur),
+    );
+  }
+  if (candidates.length !== 1) {
+    throw new ErreurAction(
+      candidates.length
+        ? "Plusieurs conversations possibles pour cette vente : remerciement non envoyé."
+        : "Conversation de l'acheteur introuvable dans la messagerie.",
+    );
+  }
+  const r = await e.client.repondre(candidates[0]!.id, texte(p, "texte"));
+  return { conversation_id: candidates[0]!.id, message_id: r.id };
 }

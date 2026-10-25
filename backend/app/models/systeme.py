@@ -98,6 +98,8 @@ class Parametres(Base):
     # Telegram : dernier update lu (long polling) et réponses en cours de modification par chat.
     telegram_offset: Mapped[int] = mapped_column(BigInteger, default=0, server_default="0")
     telegram_attente: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    # Récapitulatif des colis en notification push (sans Telegram) : dernier envoi.
+    recap_push_le: Mapped[datetime | None]
 
 
 class CompteVinted(TimestampMixin, Base):
@@ -140,6 +142,8 @@ class CompteVinted(TimestampMixin, Base):
     # Notifications Vinted déjà vues (identifiants récents) ; None tant que la première lecture n'a pas eu lieu.
     notifications_vues: Mapped[list[str] | None] = mapped_column(JSON)
     notifications_format_alerte_le: Mapped[datetime | None]
+    # Récapitulatif quotidien des colis (Telegram) : dernier envoi.
+    recap_envoye_le: Mapped[datetime | None]
     alerte_hors_ligne_le: Mapped[datetime | None]
     alerte_onglet_le: Mapped[datetime | None]
 

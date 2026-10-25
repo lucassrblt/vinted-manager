@@ -584,3 +584,38 @@ déployé. `main` n'a pas été touchée ; la branche vit dans un worktree sépa
    automatique coupée » arrive avec le nom du champ manquant.
 2. Dans ce second cas, capturer le chargement de la page d'édition d'une annonce (DevTools → Réseau, « Conserver le
    journal », « Save all as HAR ») et me l'envoyer.
+
+## Phase 7 : après-vente ✅
+
+### Fait
+- **Vente confirmée par le dressing** : après une lecture **complète** du dressing, un article vendu (mail de vente)
+  dont l'annonce n'est plus en vente (absente ou fermée) reçoit un remerciement 3 à 10 min plus tard (tâche
+  `message_apres_vente`, priorité 3, un seul par vente). Messages réglables (variantes, `{prenom}`, `{article}`).
+- **Extension** : la conversation est cherchée dans la messagerie (`data.inventory_items[].id` = l'annonce vendue,
+  interlocuteur = acheteur du mail quand il est connu) ; introuvable ou ambiguë → tâche en erreur, sans alerte.
+- **Récapitulatif quotidien** (17 h 30, réglable par compte) sur Telegram : liste des colis à préparer (date limite,
+  retard, bordereau déjà imprimé) puis le **PDF A4** des bordereaux fusionnés. Il **remplace le rappel push de 9 h**
+  dans le planificateur ; sans Telegram relié, il part en notification push à 17 h 30.
+- **Rappel la veille de la date limite d'envoi** (une fois par colis, Telegram + push).
+- Évaluations : rien d'automatique. Litige : alerte immédiate (mail, push et Telegram depuis la phase 2), aucune action.
+- README : installation de l'extension et de Telegram ; `TELEGRAM_BOT_TOKEN` dans `.env.example`.
+
+### Tests
+- Backend : 8 nouveaux tests (`tests/test_apres_vente.py`) : confirmation par disparition (et pas sur lecture
+  incomplète), annonce fermée, vente ancienne, module coupé, conversation introuvable sans alerte, récapitulatif à
+  17 h 30 avec le PDF (une fois par jour), rien à préparer, repli en push sans Telegram, rappel la veille.
+  296 tests au total. Migration `c9a7e3d4f182` vérifiée.
+- Extension : 79 tests (conversation de l'acheteur, ambiguïté, introuvable).
+
+### Décisions prises (phase 7)
+- **Remerciement seulement pour les ventes de moins de 3 jours** : rien pour les anciennes ventes au premier
+  lancement.
+- **Conversation ambiguë** (plusieurs conversations sur l'annonce, acheteur inconnu) : pas de message.
+- **Colis d'articles sans compte** (anciens articles de l'Excel) : inclus dans le récapitulatif de chaque compte relié.
+- Pas de récapitulatif « rien à préparer ».
+- Le PDF envoyé sur Telegram ne marque pas les bordereaux comme imprimés (seul le téléchargement depuis l'app le fait).
+
+### À tester toi-même (phase 7)
+1. Sur le compte de test, vendre un article (achat depuis un autre compte) : après le mail de vente puis la lecture du
+   dressing (30 min au plus), un remerciement part dans la conversation de l'acheteur.
+2. Le soir à 17 h 30 : message Telegram avec les colis et le PDF A4 des bordereaux.

@@ -45,7 +45,11 @@ const TYPES: { cle: keyof Preferences; libelle: string; aide: string }[] = [
     libelle: "Mail Vinted non reconnu",
     aide: "Un mail Vinted qu'aucune règle ne reconnaît : à vérifier pour ne rien rater.",
   },
-  { cle: "rappel_envois", libelle: "Rappel de 9 h", aide: "Les colis à déposer dans la journée et ceux en retard." },
+  {
+    cle: "rappel_envois",
+    libelle: "Colis à envoyer",
+    aide: "Récapitulatif de 17 h 30 (quand Telegram n'est pas relié) et rappel la veille de la date limite.",
+  },
 ];
 
 function nomAppareil(ua: string | null): string {

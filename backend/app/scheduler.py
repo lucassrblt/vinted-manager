@@ -10,7 +10,16 @@ from app.db import SessionLocal, utcnow
 from app.logging import log
 from app.models import Envoi, Parametres, SyncLog
 from app.models.enums import StatutEnvoi
-from app.services import baisse_prix, extension, imap_idle, imap_sync, push, republication, telegram
+from app.services import (
+    apres_vente,
+    baisse_prix,
+    extension,
+    imap_idle,
+    imap_sync,
+    push,
+    republication,
+    telegram,
+)
 from app.services.auth import nettoyer_sessions
 from app.services.stats import jour_local
 
@@ -55,7 +64,8 @@ def tache_ecoute() -> None:
 
 
 def tache_rappel_envois() -> None:
-    """9 h (heure de Paris) : rappel des colis à déposer aujourd'hui ou en retard."""
+    """Rappel push des colis à déposer aujourd'hui ou en retard (ancien rappel de 9 h, gardé pour un appel
+    manuel ; le récapitulatif de 17 h 30 le remplace dans le planificateur)."""
     with SessionLocal() as db:
         aujourdhui = jour_local(utcnow())
         limites = db.scalars(
@@ -114,6 +124,16 @@ def tache_baisse_prix() -> None:
         log.exception("baisse_prix_erreur")
 
 
+def tache_apres_vente() -> None:
+    """Toutes les 5 min : récapitulatif quotidien des colis (17 h 30) et rappels avant la date limite."""
+    try:
+        with SessionLocal() as db:
+            apres_vente.recapitulatif(db)
+            apres_vente.rappels_limite(db)
+    except Exception:
+        log.exception("apres_vente_erreur")
+
+
 def tache_nettoyage() -> None:
     with SessionLocal() as db:
         nettoyer_sessions(db)
@@ -140,7 +160,8 @@ def demarrer() -> None:
         planificateur.add_job(
             tache_ecoute, "interval", minutes=1, id="ecoute", next_run_time=utcnow(), max_instances=1
         )
-    planificateur.add_job(tache_rappel_envois, "cron", hour=9, minute=0, id="rappel_envois")
+    # Le récapitulatif de 17 h 30 (Telegram, ou push sans Telegram) remplace le rappel push de 9 h.
+    planificateur.add_job(tache_apres_vente, "interval", minutes=5, id="apres_vente", coalesce=True)
     planificateur.add_job(tache_nettoyage, "cron", hour=4, id="nettoyage")
     planificateur.add_job(tache_surveillance, "interval", minutes=1, id="surveillance", coalesce=True)
     planificateur.add_job(tache_republication, "interval", minutes=30, id="republication", coalesce=True)

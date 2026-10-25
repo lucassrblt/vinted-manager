@@ -23,7 +23,7 @@ TYPES = {
     "message": "Nouveau message",
     "favori": "Article mis en favori",
     "non_classe": "Mail Vinted non reconnu",
-    "rappel_envois": "Rappel de 9 h : colis à envoyer",
+    "rappel_envois": "Colis à envoyer (récapitulatif de 17 h 30, veille de la date limite)",
     "extension": "Extension Vinted : arrêts, erreurs, brouillons",
 }
 

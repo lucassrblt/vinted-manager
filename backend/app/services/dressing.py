@@ -28,7 +28,7 @@ ETATS_VINTED = {
     "satisfaisant": EtatArticle.SATISFAISANT,
 }
 RATTACHABLES = (StatutArticle.RECU_A_PUBLIER, StatutArticle.EN_LIGNE)
-# Traitements appelés quand une lecture complète montre des annonces disparues (phase 7 : ventes).
+# Traitements appelés après une lecture complète, avec les annonces encore en vente (phase 7 : ventes).
 APRES_SYNCHRO: list[Callable[[Session, CompteVinted, set[int]], None]] = []
 
 
@@ -153,7 +153,8 @@ def synchroniser(db: Session, compte: CompteVinted, donnees: dict[str, Any]) -> 
     for item in items:
         if item.get("is_draft"):
             continue
-        vus.add(int(item["id"]))
+        if not ferme(item):
+            vus.add(int(item["id"]))  # annonces encore en vente
         article = _rattacher(db, compte, item)
         if article is None:
             if ferme(item):

@@ -7,6 +7,7 @@ import { ErreurAction, ErreurVinted } from "../src/vinted/erreurs";
 import {
   accepterOffre,
   contreOffre,
+  messageApresVente,
   reduireConversation,
   reduireInbox,
   refuserOffre,
@@ -186,5 +187,34 @@ describe("relevé des compteurs de non-lus", () => {
     const avant = faux.appels.length;
     await c.releve();
     expect(faux.appels).toHaveLength(avant);
+  });
+});
+
+describe("remerciement après une vente", () => {
+  const vente = { item_id: "10475120267", texte: "Merci pour ton achat !" };
+
+  it("conversation de l'annonce vendue avec l'acheteur du mail", async () => {
+    const faux = new FauxVinted();
+    const r = await messageApresVente({ ...vente, acheteur: "membre_test_10" }, contexte(faux));
+    expect(r).toMatchObject({ conversation_id: CONV });
+    expect(faux.ecritures()[0]?.url).toBe(`https://api.vinted.fr/messaging/main/conversations/${CONV}/replies`);
+  });
+
+  it("acheteur inconnu et deux conversations sur l'annonce : rien n'est envoyé", async () => {
+    const faux = new FauxVinted();
+    const err = (await messageApresVente({ ...vente, acheteur: null }, contexte(faux)).catch(
+      (x: unknown) => x,
+    )) as Error;
+    expect(err.message).toContain("Plusieurs conversations");
+    expect(faux.ecritures()).toHaveLength(0);
+  });
+
+  it("conversation introuvable", async () => {
+    const faux = new FauxVinted();
+    const err = (await messageApresVente({ ...vente, acheteur: "quelqu_un" }, contexte(faux)).catch(
+      (x: unknown) => x,
+    )) as Error;
+    expect(err).toBeInstanceOf(ErreurAction);
+    expect(err.message).toBe("Conversation de l'acheteur introuvable dans la messagerie.");
   });
 });

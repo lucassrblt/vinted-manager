@@ -86,6 +86,8 @@ class Envoi(TimestampMixin, Base):
     date_limite_envoi: Mapped[datetime | None]
     statut: Mapped[str] = mapped_column(String(20), default=StatutEnvoi.A_IMPRIMER, index=True)
     date_depot: Mapped[datetime | None]
+    # Rappel envoyé la veille de la date limite d'envoi (une seule fois).
+    rappel_limite_le: Mapped[datetime | None]
 
 
 class Message(TimestampMixin, Base):
