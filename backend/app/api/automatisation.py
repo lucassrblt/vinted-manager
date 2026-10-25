@@ -329,6 +329,18 @@ def relancer_brouillon(article_id: int, db: Db) -> None:
     db.commit()
 
 
+@router.post("/articles/{article_id}/republication/debloquer", status_code=204)
+def debloquer_republication(article_id: int, db: Db) -> None:
+    """Après un échec, Lucas a vérifié l'annonce sur Vinted : la republication automatique peut reprendre."""
+    a = db.get(Article, article_id)
+    if a is None:
+        raise HTTPException(404, "Article introuvable.")
+    a.republication_bloquee = False
+    compte = db.get(CompteVinted, a.compte_id) if a.compte_id else None
+    alertes.journaliser(db, compte, "republication", f"Republication réautorisée : {a.nom}.", article_id=a.id)
+    db.commit()
+
+
 @router.post("/photos/{photo_id}/valider-couleur", status_code=204)
 def valider_couleur(photo_id: int, db: Db) -> None:
     """Lucas a comparé la photo retouchée avec l'original : la couleur est fidèle."""

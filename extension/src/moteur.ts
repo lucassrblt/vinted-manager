@@ -28,9 +28,10 @@ export interface Memoire {
   occupeDepuis: number | null;
   dernierDressing: number;
   derniereInbox: number;
-  inboxDemandee: boolean;
+  /** Dernière demande de lecture de la messagerie (compteur en hausse), horodatée. */
+  demandeInboxLe: number;
   dernieresNotifications: number;
-  notificationsDemandees: boolean;
+  demandeNotificationsLe: number;
   sourceNotifications: "api" | "www" | null;
 }
 
@@ -39,9 +40,9 @@ export const MEMOIRE_INITIALE: Memoire = {
   occupeDepuis: null,
   dernierDressing: 0,
   derniereInbox: 0,
-  inboxDemandee: false,
+  demandeInboxLe: 0,
   dernieresNotifications: 0,
-  notificationsDemandees: false,
+  demandeNotificationsLe: 0,
   sourceNotifications: null,
 };
 
@@ -99,6 +100,10 @@ export class Moteur {
       const message = e instanceof Error ? e.message : String(e);
       await env.majEtat({ statut: "erreur", message });
     } finally {
+      // Une demande arrivée pendant ce cycle (compteurs en hausse) ne doit pas être écrasée.
+      const actuelle = { ...MEMOIRE_INITIALE, ...(await env.lireMemoire()) };
+      memoire.demandeInboxLe = Math.max(memoire.demandeInboxLe, actuelle.demandeInboxLe);
+      memoire.demandeNotificationsLe = Math.max(memoire.demandeNotificationsLe, actuelle.demandeNotificationsLe);
       await env.ecrireMemoire(memoire);
     }
   }
@@ -133,17 +138,16 @@ export class Moteur {
     }
     if (
       compte.modules.assistant !== false &&
-      (memoire.inboxDemandee || env.maintenant() - memoire.derniereInbox >= PERIODE_INBOX_MS)
+      (memoire.demandeInboxLe >= memoire.derniereInbox || env.maintenant() - memoire.derniereInbox >= PERIODE_INBOX_MS)
     ) {
-      memoire.inboxDemandee = false;
       memoire.derniereInbox = env.maintenant();
       if (!(await this.lireMessagerie(backend, onglet, compte))) return;
     }
     if (
       compte.modules.favoris !== false &&
-      (memoire.notificationsDemandees || env.maintenant() - memoire.dernieresNotifications >= PERIODE_NOTIFICATIONS_MS)
+      (memoire.demandeNotificationsLe >= memoire.dernieresNotifications ||
+        env.maintenant() - memoire.dernieresNotifications >= PERIODE_NOTIFICATIONS_MS)
     ) {
-      memoire.notificationsDemandees = false;
       memoire.dernieresNotifications = env.maintenant();
       const r = await this.lecture<{ source: "api" | "www"; notifications: unknown[] }>(backend, compte, onglet, {
         type: "notifications",
@@ -224,6 +228,8 @@ export class Moteur {
         id: nouvelId(),
         payload: {
           conversation_id: conversation,
+          item_id: p.item_id,
+          membre_id: p.membre_id,
           texte: p.texte,
           montant: p.montant,
           vinted_user_id: compte.vinted_user_id,
@@ -254,8 +260,8 @@ export class Moteur {
   /** Compteurs de non-lus en hausse (ou erreur) signalés par l'onglet. */
   async compteurs(c: Compteurs): Promise<void> {
     const memoire = { ...MEMOIRE_INITIALE, ...(await this.env.lireMemoire()) };
-    memoire.inboxDemandee = true;
-    memoire.notificationsDemandees = true;
+    memoire.demandeInboxLe = this.env.maintenant();
+    memoire.demandeNotificationsLe = this.env.maintenant();
     await this.env.ecrireMemoire(memoire);
     if (c.arret && c.erreur && this.env.backend) {
       const compte = await this.env.backend.compte();

@@ -619,3 +619,28 @@ déployé. `main` n'a pas été touchée ; la branche vit dans un worktree sépa
 1. Sur le compte de test, vendre un article (achat depuis un autre compte) : après le mail de vente puis la lecture du
    dressing (30 min au plus), un remerciement part dans la conversation de l'acheteur.
 2. Le soir à 17 h 30 : message Telegram avec les colis et le PDF A4 des bordereaux.
+
+## Relecture de sécurité (après la phase 7) ✅
+
+Une relecture indépendante de toute la branche, au regard des règles absolues (section 0.3), a relevé 10 problèmes,
+tous corrigés (migration `d2b6f9e0a571` vérifiée, 298 tests backend, 81 tests extension) :
+1. **Republication en échec relancée toutes les 30 min** (risque de doublon d'annonce) → l'article est **bloqué**
+   après tout échec ou interruption ; bouton « Réautoriser la republication » sur la fiche article après vérification.
+2. **Relance d'un favori renvoyée** avant republication après un échec → jamais de seconde relance pour un membre déjà
+   relancé (même en échec).
+3. **`want_it` pouvait reprendre l'ancienne conversation** de l'onglet de travail → l'URL d'avant la navigation est
+   ignorée, l'URL en cours de chargement prime, et la conversation doit être celle du membre et de l'annonce avant
+   tout envoi.
+4. **Réponse manuelle non détectée** (l'inbox donne toujours `sender_id: "0"`) et conversations relues sans fin → le
+   point de reprise avance sur le dernier message de la conversation, quel qu'en soit l'auteur ; une réponse faite sur
+   Vinted annule la réponse prévue ; dates de l'inbox arrondies à la seconde.
+5. **Une réponse à un acheteur pouvait arrêter le compte** quand les relances avaient épuisé le budget → 10 messages
+   et 10 offres par jour sont réservés aux réponses aux acheteurs.
+6. **Blocage sur api.vinted.fr sans en-têtes CORS** (vu comme une coupure réseau) → arrêt au 3e relevé en échec
+   d'affilée.
+7. **Demande de lecture de la messagerie perdue** pendant une tâche longue → demandes horodatées et fusionnées.
+8. **Baisse de prix** : plus aucun champ comblé par défaut ; `isbn`, mesures, `manufacturer*` et `shipment_prices`
+   doivent figurer dans l'annonce lue, sinon rien n'est envoyé.
+9. **Un seul message par membre** même après republication (contrôle aussi par article).
+10. **Republication impossible** (fiche incomplète) : reportée sans modifier la date de publication (qui aurait
+    déclenché une baisse de prix tardive).

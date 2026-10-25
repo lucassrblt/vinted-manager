@@ -28,8 +28,21 @@ export function BlocVinted({ article: a }: { article: Article }) {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+  const debloquer = useMutation({
+    mutationFn: () => api(`/articles/${a.id}/republication/debloquer`, { method: "POST" }),
+    onSuccess: () => {
+      invalider();
+      toast.success("Republication réautorisée");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
   const rien =
-    !a.brouillon_statut && !a.vinted_item_id && !a.vinted_draft_id && !a.prix_initial && !a.couleur_a_verifier;
+    !a.republication_bloquee &&
+    !a.brouillon_statut &&
+    !a.vinted_item_id &&
+    !a.vinted_draft_id &&
+    !a.prix_initial &&
+    !a.couleur_a_verifier;
   if (rien) {
     return (
       <p className="text-sm text-muted-foreground">
@@ -60,6 +73,17 @@ export function BlocVinted({ article: a }: { article: Article }) {
           <p>{a.brouillon_erreur}</p>
           <Button size="xs" variant="outline" disabled={relancer.isPending} onClick={() => relancer.mutate()}>
             <RotateCcw /> Relancer le brouillon
+          </Button>
+        </dd>
+      )}
+      {a.republication_bloquee && (
+        <dd className="col-span-2 space-y-2 rounded-lg bg-red-50 p-2 text-red-800 dark:bg-red-950/40 dark:text-red-300">
+          <p>
+            La dernière republication a échoué : vérifie l&apos;annonce sur Vinted (doublon, brouillon restant) avant de
+            la réautoriser.
+          </p>
+          <Button size="xs" variant="outline" disabled={debloquer.isPending} onClick={() => debloquer.mutate()}>
+            <RotateCcw /> Réautoriser la republication
           </Button>
         </dd>
       )}

@@ -211,9 +211,12 @@ def candidats(db: Session, compte: CompteVinted) -> list[Article]:
                 Article.compte_id == compte.id,
                 Article.statut == StatutArticle.EN_LIGNE,
                 Article.vinted_item_id.is_not(None),
+                Article.republication_bloquee.is_(False),  # échec précédent : Lucas vérifie d'abord
             )
         )
-        if (d := derniere_publication(a)) is not None and maintenant - d >= cadence
+        if (d := derniere_publication(a)) is not None
+        and maintenant - d >= cadence
+        and (a.republication_reportee_le is None or maintenant - a.republication_reportee_le >= cadence)
     ]
     return sorted(liste, key=lambda a: derniere_publication(a) or maintenant)
 
@@ -244,9 +247,7 @@ def preparer(db: Session, compte: CompteVinted, article: Article, params: Parame
             "alerte",
             article.id,
         )
-        article.derniere_publication_le = (
-            horaires.maintenant()
-        )  # on ne réessaie pas avant la prochaine échéance
+        article.republication_reportee_le = horaires.maintenant()  # prochain examen à la prochaine échéance
         return None
     titre, description = texte_republication(db, compte, article)
     r = reglages.du_compte(compte)["republication"]
@@ -349,6 +350,9 @@ def _apres(db: Session, compte: CompteVinted, tache: TacheVinted, ok: bool) -> N
         if tache.payload.get("titre"):
             article.titre_annonce = str(tache.payload["titre"])[:120]
             article.description_annonce = str(tache.payload.get("description") or article.description_annonce)
+    if article is not None and not ok:
+        # Jamais de nouvel essai automatique : l'état réel sur Vinted est incertain (doublon possible).
+        article.republication_bloquee = True
     nom = article.nom if article else str(tache.payload.get("titre"))
     if ok:
         alertes.journaliser(
@@ -367,7 +371,7 @@ def _apres(db: Session, compte: CompteVinted, tache: TacheVinted, ok: bool) -> N
             compte,
             "tache_erreur",
             "Republication en échec",
-            f"{nom} : {tache.erreur or ''} L'ancienne annonce reste en ligne.",
+            f"{nom} : {tache.erreur or ''} Vérifie l'annonce sur Vinted, puis réautorise la republication sur la fiche article.",
             article_id=tache.article_id,
         )
 

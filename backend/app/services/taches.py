@@ -166,12 +166,22 @@ def plafonds(compte: CompteVinted) -> dict[str, int]:
     }
 
 
+# Part des plafonds « messages » et « offres » gardée pour les réponses aux acheteurs.
+RESERVE_REPONSES = 10
+
+
 def depassement(type_tache: str, usage: dict[str, int], limites: dict[str, int]) -> str | None:
-    """« jour » si un plafond journalier serait dépassé, « heure » pour le plafond horaire, sinon None."""
+    """« jour » si un plafond journalier serait dépassé, « heure » pour le plafond horaire, sinon None.
+    Les actions non urgentes s'arrêtent avant les plafonds de messages et d'offres : une réserve reste
+    pour répondre aux acheteurs."""
     if type_tache in HORS_BUDGET:
         return None
+    reponse = type_tache in TYPES_REPONSE_ACHETEUR
     for categorie, n in CONSOMMATION.get(type_tache, {}).items():
-        if usage[categorie] + n > limites[categorie]:
+        limite = limites[categorie]
+        if not reponse and categorie in ("messages", "offres"):
+            limite = max(0, limite - RESERVE_REPONSES)
+        if usage[categorie] + n > limite:
             return "jour"
     if type_tache not in TYPES_REPONSE_ACHETEUR and usage["heure"] + 1 > limites["heure"]:
         return "heure"

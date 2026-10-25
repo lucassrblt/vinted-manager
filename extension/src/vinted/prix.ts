@@ -8,7 +8,7 @@ import type { ClientVinted } from "./client";
 import { verifierCompte } from "./compte";
 import { ErreurAction } from "./erreurs";
 
-// Champs toujours nuls dans les captures pour des vêtements : pris tels quels s'ils sont présents, nuls sinon.
+// Champs souvent nuls : ils doivent quand même figurer dans l'annonce lue (sinon, champ manquant).
 const NULS_POSSIBLES = ["isbn", "measurement_length", "measurement_width", "manufacturer", "manufacturer_labelling"];
 
 type Objet = Record<string, unknown>;
@@ -68,12 +68,15 @@ export function reconstruireItem(item: Objet, nouveauPrix: string, aiPhoto: bool
     ai_photo: requis("ai_photo", aiPhoto ?? (typeof item.ai_photo === "boolean" ? item.ai_photo : null)),
     price: nouveauPrix,
     package_size_id: requis("package_size_id", nombre(item.package_size_id)),
-    shipment_prices: objet(item.shipment_prices) ?? { domestic: null, international: null },
+    shipment_prices: requis("shipment_prices", objet(item.shipment_prices)),
     color_ids: requis("color_ids", couleurs),
     assigned_photos: requis("photos", photos.length ? photos : null),
     item_attributes: requis("item_attributes", attributs.length ? attributs : null),
   };
-  for (const cle of NULS_POSSIBLES) resultat[cle] = cle in item ? item[cle] : null;
+  for (const cle of NULS_POSSIBLES) {
+    if (cle in item) resultat[cle] = item[cle];
+    else manquants.push(cle);
+  }
   if (manquants.length) {
     throw new ErreurAction(`Champ manquant dans l'annonce lue : ${manquants.join(", ")}.`);
   }

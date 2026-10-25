@@ -186,7 +186,7 @@ describe("surveillance de Vinted", () => {
     const sim = environnement();
     await sim.moteur.compteurs({ messages: null, notifications: null, erreur: "Captcha Vinted détecté", arret: true });
     expect(sim.backend.chemins()).toEqual(["GET /compte", "POST /arret"]);
-    expect(sim.memoire().inboxDemandee).toBe(true);
+    expect(sim.memoire().demandeInboxLe).toBeGreaterThan(0);
   });
 });
 
@@ -221,6 +221,8 @@ describe("favoris", () => {
     ]);
     expect(sim.contenu.messages.at(-1)?.payload).toEqual({
       conversation_id: "01a1729a-df35-7e50-84fc-f46b8ec2dc6a",
+      item_id: 10475120267,
+      membre_id: 900000005,
       texte: "Hello !",
       montant: "6.5",
       vinted_user_id: 3201823662,

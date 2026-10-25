@@ -169,6 +169,14 @@ def enregistrer(
     article = db.scalar(
         select(Article).where(Article.vinted_item_id == item_id, Article.compte_id == compte.id)
     )
+    if article is not None and db.scalar(
+        select(FavoriVinted.id).where(
+            FavoriVinted.article_id == article.id, FavoriVinted.membre_id == membre_id
+        )
+    ):
+        return (
+            False  # même article (annonce republiée depuis) : un seul message et une seule offre par membre
+        )
     favori = FavoriVinted(
         compte_id=compte.id,
         article_id=article.id if article else None,
@@ -303,7 +311,8 @@ def relancer_avant_republication(db: Session, compte: CompteVinted, article: Art
             FavoriVinted.compte_id == compte.id,
             FavoriVinted.vinted_item_id == article.vinted_item_id,
             FavoriVinted.offre_envoyee.is_(False),
-            FavoriVinted.statut.in_(("a_relancer", "ignore", "erreur")),
+            FavoriVinted.statut.in_(("a_relancer", "ignore")),  # jamais après une relance commencée
+            FavoriVinted.tache_id.is_(None),
         )
     ):
         texte = message(random.choice(r["favoris"]["messages"]), f.membre_login, article, montant)

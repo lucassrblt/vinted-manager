@@ -434,7 +434,9 @@ def test_reponse_la_nuit_en_5_a_15_minutes(
         client, lucas[1], "inbox", inbox(iso(-60), str(LUCAS_VINTED))
     )  # captures datées de 10 h : recalées
     a_heure(monkeypatch, 1, 30)
-    evenement(client, lucas[1], "conversation", conversation(message_texte("Bonsoir, dispo ?", iso())))
+    corps = conversation()
+    corps["messages"] = [message_texte("Bonsoir, dispo ?", iso())]  # captures datées de 10 h : retirées
+    evenement(client, lucas[1], "conversation", corps)
     t = taches_de(db)[0]
     assert timedelta(minutes=5) <= t.executer_apres - horaires.maintenant() <= timedelta(minutes=15)
 
@@ -577,3 +579,25 @@ def test_dressing_rattache_par_titre_et_brouillon_publie(
 def test_evenement_inconnu(client: TestClient, lucas: tuple[CompteVinted, str]) -> None:
     r = client.post("/api/extension/evenements", json={"type": "inconnu"}, headers=entetes(lucas[1]))
     assert r.status_code == 422
+
+
+def test_point_de_reprise_et_reponse_manuelle_lue_dans_la_conversation(
+    client: TestClient,
+    db: Session,
+    lucas: tuple[CompteVinted, str],
+    sweat: Article,
+    initialise: None,
+    ia_simulee: Any,
+) -> None:
+    evenement(client, lucas[1], "conversation", conversation(message_texte("Bonjour", iso())))
+    # L'inbox n'indique jamais l'auteur (sender_id « 0 ») : c'est la conversation qui montre la réponse manuelle.
+    reponse_lucas = {
+        "conversation_id": CONV_ID, "created_at": iso(2), "id": "m-lucas", "message_type": "reply_plain",
+        "sender_id": str(LUCAS_VINTED), "data": {"content": "Oui !"},
+    }  # fmt: skip
+    evenement(client, lucas[1], "conversation", conversation(message_texte("Bonjour", iso()), reponse_lucas))
+    assert [t.statut for t in taches_de(db)] == ["annulee"]
+    conv = db.get(ConversationVinted, CONV_ID)
+    assert conv is not None and conv.dernier_traite_le is not None
+    # Inbox dont la date est celle du dernier message déjà traité : rien à relire.
+    assert evenement(client, lucas[1], "inbox", inbox(conv.dernier_traite_le.isoformat())) == {"a_lire": []}

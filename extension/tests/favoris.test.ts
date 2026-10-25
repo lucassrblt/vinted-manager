@@ -41,7 +41,13 @@ describe("relance d'un favori", () => {
     const faux = new FauxVinted();
     const attendre = vi.fn(async () => undefined);
     const r = await relancer(
-      { conversation_id: "01a16aa3-daff-79bb-a570-c156d97cb288", texte: "Hello !", montant: "20" },
+      {
+        conversation_id: "01a16aa3-daff-79bb-a570-c156d97cb288",
+        item_id: 10475120267,
+        membre_id: 900000014,
+        texte: "Hello !",
+        montant: "20",
+      },
       { client: client(faux), vintedUserId: 3201823662, attendre, aleatoire: () => 0.5 },
     );
     expect(r).toMatchObject({ transaction_id: "23517428140", offre_envoyee: true, offer_id: 38066597320 });
@@ -55,10 +61,20 @@ describe("relance d'un favori", () => {
   it("offre refusée par Vinted après le message : erreur explicite", async () => {
     const faux = new FauxVinted().sur("POST", /\/offers$/, () => ({ status: 422, body: { message: "Prix invalide" } }));
     const err = (await relancer(
-      { conversation_id: "c-1", texte: "Hello", montant: "20" },
+      { conversation_id: "c-1", item_id: 10475120267, membre_id: 900000014, texte: "Hello", montant: "20" },
       { client: client(faux), vintedUserId: 3201823662, attendre: async () => undefined },
     ).catch((e: unknown) => e)) as Error;
     expect(err.message).toMatch(/^Message envoyé, mais offre non envoyée : Vinted a refusé la demande \(422\)/);
+  });
+
+  it("conversation d'un autre membre ou d'une autre annonce : rien n'est envoyé", async () => {
+    const faux = new FauxVinted();
+    const err = await relancer(
+      { conversation_id: "c-1", item_id: 10475120267, membre_id: 42, texte: "Hello", montant: "20" },
+      { client: client(faux), vintedUserId: 3201823662, attendre: async () => undefined },
+    ).catch((e: unknown) => e);
+    expect((err as Error).message).toContain("n'est pas celle de ce membre");
+    expect(faux.ecritures()).toHaveLength(0);
   });
 
   it("URL de la conversation après la redirection", () => {

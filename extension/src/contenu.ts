@@ -63,6 +63,7 @@ export const RELEVE_JOUR_MS: [number, number] = [15_000, 30_000];
 export const RELEVE_NUIT_MS = 5 * 60_000;
 // Sans nouvelle du service worker pendant ce délai, la surveillance s'arrête d'elle-même.
 export const VALIDITE_SURVEILLANCE_MS = 2 * 60_000;
+export const ECHECS_RELEVE_MAX = 3;
 
 export interface DependancesContenu {
   client: () => ClientVinted;
@@ -100,6 +101,7 @@ export class Contenu {
   private surveillance = { actif: false, nuit: false, jusqua: 0 };
   private derniers: { messages: number; notifications: number } | null = null;
   private boucle = false;
+  private echecsReleve = 0;
 
   constructor(private readonly d: DependancesContenu) {}
 
@@ -111,6 +113,7 @@ export class Contenu {
     try {
       const [m, n] = await Promise.all([client.nonLusMessages(), client.nonLusNotifications()]);
       const actuels = { messages: Number(m.unread_count) || 0, notifications: Number(n.count) || 0 };
+      this.echecsReleve = 0;
       const avant = this.derniers;
       this.derniers = actuels;
       if (avant && (actuels.messages > avant.messages || actuels.notifications > avant.notifications)) {
@@ -118,7 +121,15 @@ export class Contenu {
       }
     } catch (e) {
       const r = versReponse(e);
-      if (r.arret) this.d.signaler?.({ messages: null, notifications: null, erreur: r.erreur, arret: true });
+      this.echecsReleve += 1;
+      // Une réponse bloquée sans en-têtes CORS ressemble à une coupure réseau : au 3e échec d'affilée, arrêt.
+      if (r.arret || this.echecsReleve >= ECHECS_RELEVE_MAX) {
+        const erreur = r.arret
+          ? r.erreur
+          : `Vinted ne répond plus (${this.echecsReleve} relevés d'affilée) : ${r.erreur}`;
+        this.d.signaler?.({ messages: null, notifications: null, erreur, arret: true });
+        this.echecsReleve = 0;
+      }
     }
   }
 

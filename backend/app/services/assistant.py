@@ -117,6 +117,7 @@ def inbox(db: Session, compte: CompteVinted, donnees: dict[str, Any]) -> dict[st
         date = horaires.date_vinted(dernier.get("created_at"))
         if date is None:
             continue
+        date = date.replace(microsecond=0)  # l'inbox donne des dixièmes de seconde, la conversation non
         if conv.dernier_message_le is None or date > conv.dernier_message_le:
             conv.dernier_message_le = date
         if premiere:
@@ -185,10 +186,23 @@ def conversation(db: Session, compte: CompteVinted, donnees: dict[str, Any]) -> 
             continue
         nouveaux.append((date, m))
     nouveaux.sort(key=lambda x: x[0])
+    # Point de reprise : le message le plus récent, quel qu'en soit l'auteur (sinon relu à chaque passage).
+    tous = [
+        (d, m)
+        for m in donnees.get("messages") or []
+        if isinstance(m, dict) and (d := horaires.date_vinted(m.get("created_at"))) is not None
+    ]
+    if tous:
+        plus_recent_date, plus_recent = max(tous, key=lambda x: x[0])
+        conv.dernier_traite_le = max(conv.dernier_traite_le or plus_recent_date, plus_recent_date)
+        if soi is not None and _id_user(plus_recent.get("sender_id")) == soi:
+            # Réponse faite sur Vinted (à la main ou par l'extension) : la réponse prévue n'a plus lieu d'être.
+            taches.annuler(db, compte, "repondre_message", conversation_id=conv.id)
+            nouveaux = []
     if not nouveaux:
+        db.flush()
         return {"traite": 0}
     conv.messages_vus = (vus + [str(m.get("id")) for _, m in nouveaux])[-VUS_MAX:]
-    conv.dernier_traite_le = nouveaux[-1][0]
     offres_recues = [m for _, m in nouveaux if m.get("message_type") in TYPES_OFFRE]
     textes = [_texte(m) for _, m in nouveaux if m.get("message_type") in TYPES_TEXTE and _texte(m)]
     article = db.get(Article, conv.article_id) if conv.article_id else None

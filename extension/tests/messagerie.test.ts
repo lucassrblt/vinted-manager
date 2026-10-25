@@ -218,3 +218,25 @@ describe("remerciement après une vente", () => {
     expect(err.message).toBe("Conversation de l'acheteur introuvable dans la messagerie.");
   });
 });
+
+describe("relevé des compteurs : Vinted injoignable", () => {
+  it("3 échecs d'affilée (réponse bloquée sans CORS) : arrêt signalé", async () => {
+    const faux = new FauxVinted().sur("GET", /unread_count/, () => {
+      throw new TypeError("Failed to fetch");
+    });
+    const signaler = vi.fn();
+    const c = new Contenu({
+      client: () => new ClientVinted(faux.fetch, { csrf: "c", anonId: "a", siid: null }),
+      demanderPhoto: async () => ({ ok: false, erreur: "x", arret: false, mauvais_compte: false }),
+      attendre: async () => undefined,
+      maintenant: () => 0,
+      signaler,
+    });
+    await c.traiter({ type: "surveillance", id: "1", payload: { actif: true, nuit: false } });
+    await c.releve();
+    await c.releve();
+    expect(signaler).not.toHaveBeenCalled();
+    await c.releve();
+    expect(signaler).toHaveBeenCalledWith(expect.objectContaining({ arret: true }));
+  });
+});

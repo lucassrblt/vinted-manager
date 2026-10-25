@@ -115,6 +115,7 @@ class ArticleOut(BaseModel):
     vinted_favoris: int | None = None
     derniere_publication_le: datetime | None = None
     republications: int = 0
+    republication_bloquee: bool = False
     baisse_prix_le: datetime | None = None
     prix_avant_baisse: Decimal | None = None
     created_at: datetime

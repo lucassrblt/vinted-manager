@@ -234,3 +234,13 @@ def test_resultat_relance(
     assert db.scalars(select(JournalVinted).where(JournalVinted.type == "tache_erreur")).first() is not None
     usage = client.get("/api/automatisation/comptes").json()[0]["budget_utilise"]
     assert usage["messages"] == 2 and usage["offres"] == 2  # chaque relance : un message et une offre
+
+
+def test_un_seul_message_par_membre_meme_apres_republication(
+    client: TestClient, db: Session, lucas: tuple[CompteVinted, str], sweat: Article, initialise: None
+) -> None:
+    evenement(client, lucas[1], {"notifications": [notif("n1", iso())]})
+    sweat.vinted_item_id = 99999999  # annonce republiée : nouvel identifiant
+    db.commit()
+    evenement(client, lucas[1], {"notifications": [notif("n2", iso(1), item=99999999)]})
+    assert len(db.scalars(select(TacheVinted)).all()) == 1

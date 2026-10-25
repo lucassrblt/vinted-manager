@@ -85,6 +85,10 @@ class Article(TimestampMixin, Base):
     # Republication : date de la dernière mise en ligne et nombre de republications.
     derniere_publication_le: Mapped[datetime | None]
     republications: Mapped[int] = mapped_column(default=0, server_default="0")
+    # Republication en échec : plus aucune republication automatique tant que Lucas n'a pas vérifié.
+    republication_bloquee: Mapped[bool] = mapped_column(default=False, server_default="false")
+    # Republication impossible (fiche incomplète) : prochain examen à la prochaine échéance.
+    republication_reportee_le: Mapped[datetime | None]
     # Baisse de prix automatique : une seule fois par article (date, même si aucune baisse n'était possible).
     baisse_prix_le: Mapped[datetime | None]
     prix_avant_baisse: Mapped[Decimal | None] = mapped_column(Money)

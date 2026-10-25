@@ -52,6 +52,7 @@ export interface Article {
   vinted_favoris: number | null;
   derniere_publication_le: string | null;
   republications: number;
+  republication_bloquee: boolean;
   baisse_prix_le: string | null;
   prix_avant_baisse: Decimal | null;
   created_at: string;

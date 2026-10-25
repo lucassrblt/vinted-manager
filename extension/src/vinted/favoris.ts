@@ -69,6 +69,8 @@ export async function lireNotifications(
 
 export interface Relance {
   conversation_id: string;
+  item_id: number;
+  membre_id: number;
   texte: string;
   montant: string;
 }
@@ -83,6 +85,13 @@ export async function relancer(
 ): Promise<Record<string, unknown>> {
   await verifierCompte(e.client, e.vintedUserId);
   const conversation = await e.client.conversation(r.conversation_id);
+  const bonneAnnonce = (conversation.data?.items ?? []).some((i) => String(i.inventory_item_id) === String(r.item_id));
+  const bonMembre = (conversation.opposite_users ?? []).some((u) => String(u.data?.id) === String(r.membre_id));
+  if (!bonneAnnonce || !bonMembre) {
+    throw new ErreurAction(
+      "La conversation ouverte n'est pas celle de ce membre et de cette annonce : rien n'est envoyé.",
+    );
+  }
   const transaction = conversation.data?.transaction_id;
   if (transaction === null || transaction === undefined || String(transaction) === "") {
     throw new ErreurAction("Transaction introuvable dans la conversation ouverte.");

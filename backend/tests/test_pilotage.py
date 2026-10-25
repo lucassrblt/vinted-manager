@@ -228,7 +228,7 @@ def test_plafond_journalier(
     compte, jeton = lucas
     client.put(
         f"/api/automatisation/comptes/{compte.id}/reglages",
-        json={"budget": {"offres_jour": 1, "messages_jour": 1}},
+        json={"budget": {"offres_jour": 11, "messages_jour": 11}},
     )
     db.refresh(compte)
     a_heure(monkeypatch, 14)
@@ -237,11 +237,19 @@ def test_plafond_journalier(
     assert t is not None
     _resultat(client, jeton, t["id"])
     a_heure(monkeypatch, 15)
+    # 10 messages et 10 offres restent réservés aux réponses aux acheteurs : la relance attend demain.
     relance = _tache(db, compte, "relance_favori")
     assert _suivante(client, jeton) is None
     db.refresh(relance)
     assert horaires.local(relance.executer_apres).date() > horaires.local().date()  # demain
+    for minute in range(10):  # la réserve sert aux réponses
+        a_heure(monkeypatch, 15, minute)
+        _tache(db, compte, "repondre_message", payload={"n": minute})
+        r = _suivante(client, jeton)
+        assert r is not None and r["type"] == "repondre_message"
+        _resultat(client, jeton, r["id"])
     # Une réponse d'acheteur au-delà du plafond : situation anormale, arrêt du compte.
+    a_heure(monkeypatch, 15, 30)
     _tache(db, compte, "repondre_message")
     assert _suivante(client, jeton) is None
     db.refresh(compte)

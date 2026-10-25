@@ -40,31 +40,34 @@ async function envoyer<R>(onglet: number, message: VersContenu): Promise<Reponse
   }
 }
 
-/** Onglet de travail : ouvert en arrière-plan par l'extension et réutilisé (jamais l'onglet de Lucas). */
-async function ongletDeTravail(url: string): Promise<number> {
+/** Onglet de travail : ouvert en arrière-plan par l'extension et réutilisé (jamais l'onglet de Lucas).
+ * Renvoie son identifiant et l'URL qu'il affichait avant la navigation. */
+async function ongletDeTravail(url: string): Promise<{ id: number; avant: string }> {
   const { ongletTravail } = (await chrome.storage.session.get("ongletTravail")) as { ongletTravail?: number };
   if (ongletTravail !== undefined) {
     try {
+      const avant = (await chrome.tabs.get(ongletTravail)).url ?? "";
       await chrome.tabs.update(ongletTravail, { url });
-      return ongletTravail;
+      return { id: ongletTravail, avant };
     } catch {
       /* onglet fermé : on en ouvre un autre */
     }
   }
   const onglet = await chrome.tabs.create({ url, active: false });
   await chrome.storage.session.set({ ongletTravail: onglet.id });
-  return onglet.id as number;
+  return { id: onglet.id as number, avant: "" };
 }
 
 async function naviguer(url: string, attendue: (url: string) => boolean, delaiMs: number): Promise<string | null> {
-  const id = await ongletDeTravail(url);
+  const { id, avant } = await ongletDeTravail(url);
   const fin = Date.now() + delaiMs;
   while (Date.now() < fin) {
     await attendre(500);
     try {
       const onglet = await chrome.tabs.get(id);
-      const actuelle = onglet.url ?? onglet.pendingUrl ?? "";
-      if (actuelle && actuelle !== url && attendue(actuelle)) return actuelle;
+      // L'URL en cours de chargement d'abord : `url` reste l'ancienne page tant que la nouvelle n'est pas validée.
+      const actuelle = onglet.pendingUrl ?? onglet.url ?? "";
+      if (actuelle && actuelle !== url && actuelle !== avant && attendue(actuelle)) return actuelle;
     } catch {
       return null;
     }

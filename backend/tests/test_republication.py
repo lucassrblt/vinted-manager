@@ -229,7 +229,7 @@ def test_offres_aux_favoris_avant_la_republication(
     db.commit()
     assert republication.planifier(db) == 0
     relances = taches_de(db, "relance_favori")
-    assert sorted(t.payload["membre_id"] for t in relances) == [1, 3]
+    assert sorted(t.payload["membre_id"] for t in relances) == [1]  # jamais après une relance en échec (3)
     assert all(t.payload["montant"] == "21.5" and t.payload["avant_republication"] for t in relances)
     assert not taches_de(db, "republication")
     for t in relances:  # relances faites
@@ -355,5 +355,12 @@ def test_echec_l_ancienne_reste_en_ligne(
         monkeypatch,
     )
     db.expire_all()
-    assert db.get(Article, en_ligne.id).vinted_item_id == 10495425715  # type: ignore[union-attr]
-    assert "L'ancienne annonce reste en ligne" in telegram_faux.textes()[-1]
+    a = db.get(Article, en_ligne.id)
+    assert a is not None and a.vinted_item_id == 10495425715 and a.republication_bloquee
+    assert "réautorise la republication" in telegram_faux.textes()[-1]
+    # Jamais de nouvel essai automatique tant que Lucas n'a pas vérifié.
+    a_heure(monkeypatch, 16)
+    assert republication.planifier(db) == 0
+    assert client.post(f"/api/articles/{a.id}/republication/debloquer").status_code == 204
+    db.expire_all()
+    assert republication.planifier(db) == 1
