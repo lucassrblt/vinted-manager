@@ -58,7 +58,8 @@ export class FauxBackend {
   fetch = async (url: string, init: RequestInit): Promise<Response> => {
     const chemin = url.replace("http://localhost:8000/api/extension", "");
     const methode = init.method ?? "GET";
-    const corps = typeof init.body === "string" ? JSON.parse(init.body) : null;
+    const corps =
+      typeof init.body === "string" ? JSON.parse(init.body) : init.body instanceof FormData ? "<formulaire>" : null;
     const jeton = (init.headers as Record<string, string>)["X-Extension-Token"] ?? null;
     this.appels.push({ methode, chemin, corps, jeton });
     const g =

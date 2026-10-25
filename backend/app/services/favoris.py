@@ -288,3 +288,33 @@ def _apres_relance(db: Session, compte: CompteVinted, tache: TacheVinted, ok: bo
 
 
 file_vinted.EVENEMENTS["notifications"] = notifications
+
+
+def relancer_avant_republication(db: Session, compte: CompteVinted, article: Article) -> int:
+    """Avant la republication : une offre aux membres qui ont mis l'annonce en favori et n'en ont pas reçu.
+    Seule source : l'historique des favoris enregistré ici (aucun autre appel à Vinted)."""
+    r = reglages.du_compte(compte)
+    montant = montant_offre(article, r["favoris"]["reduction_pct"], r["prix"]["plancher_pct"])
+    if montant is None or article.vinted_item_id is None:
+        return 0
+    n = 0
+    for f in db.scalars(
+        select(FavoriVinted).where(
+            FavoriVinted.compte_id == compte.id,
+            FavoriVinted.vinted_item_id == article.vinted_item_id,
+            FavoriVinted.offre_envoyee.is_(False),
+            FavoriVinted.statut.in_(("a_relancer", "ignore", "erreur")),
+        )
+    ):
+        texte = message(random.choice(r["favoris"]["messages"]), f.membre_login, article, montant)
+        tache = taches.creer(
+            db, compte, "relance_favori",
+            {"item_id": f.vinted_item_id, "membre_id": f.membre_id, "login": f.membre_login, "texte": texte,
+             "montant": brouillons.prix_texte(montant), "article": article.nom, "favori_id": f.id, "avant_republication": True},
+            article.id, horaires.maintenant() + horaires.delai(r["favoris"]["delai_min_s"], 10 * 60),
+            cle=f"favori-republication:{f.vinted_item_id}:{f.membre_id}",
+        )  # fmt: skip
+        if tache.statut == "a_faire":
+            f.statut, f.tache_id, f.montant_offre = "programme", tache.id, montant
+            n += 1
+    return n

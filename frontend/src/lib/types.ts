@@ -48,6 +48,10 @@ export interface Article {
   prix_initial: Decimal | null;
   prix_plancher: Decimal | null;
   importe_vinted: boolean;
+  vinted_vues: number | null;
+  vinted_favoris: number | null;
+  derniere_publication_le: string | null;
+  republications: number;
   created_at: string;
   updated_at: string;
   prix_vente: Decimal | null;

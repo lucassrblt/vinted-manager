@@ -72,6 +72,14 @@ async function naviguer(url: string, attendue: (url: string) => boolean, delaiMs
   return null;
 }
 
+/** Images publiques de Vinted (CDN), sans cookie : elles n'agissent pas sur le compte. */
+async function telecharger(url: string): Promise<Blob> {
+  if (!/^https:\/\/[a-z0-9-]+\.vinted\.net\//.test(url)) throw new Error(`Adresse d'image refusée : ${url}`);
+  const res = await fetch(url, { credentials: "omit" });
+  if (!res.ok) throw new Error(`Image indisponible (${res.status}).`);
+  return res.blob();
+}
+
 let enCours: Promise<void> | null = null;
 
 async function moteur(): Promise<Moteur> {
@@ -87,6 +95,7 @@ async function moteur(): Promise<Moteur> {
     ecrireMemoire: (memoire) => chrome.storage.local.set({ memoire }),
     majEtat,
     ongletTravail: { naviguer },
+    telecharger,
     version: chrome.runtime.getManifest().version,
   });
 }
@@ -122,7 +131,8 @@ chrome.runtime.onMessage.addListener(
         if (!b)
           return repondre({ ok: false, erreur: "Extension non configurée.", arret: false, mauvais_compte: false });
         try {
-          const octets = await b.photo(message.payload.photo_id);
+          const ref = message.payload;
+          const octets = "photo_id" in ref ? await b.photo(ref.photo_id) : await b.photoTache(ref.tache_id, ref.index);
           repondre({ ok: true, resultat: { base64: blobVersBase64(octets) } } satisfies Reponse<PhotoBase64>);
         } catch (e) {
           repondre({ ok: false, erreur: (e as Error).message, arret: false, mauvais_compte: false });

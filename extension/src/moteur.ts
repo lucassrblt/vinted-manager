@@ -62,6 +62,8 @@ export interface Environnement {
   ecrireMemoire(m: Memoire): Promise<void>;
   majEtat(partiel: Partial<Etat>): Promise<void>;
   ongletTravail: OngletTravail;
+  /** Téléchargement d'une image publique de Vinted (photos de référence d'une annonce importée). */
+  telecharger(url: string): Promise<Blob>;
   version: string;
 }
 
@@ -160,11 +162,13 @@ export class Moteur {
       const r =
         tache.type === "relance_favori"
           ? await this.relanceFavori(onglet, tache, compte)
-          : await env.envoyer<Record<string, unknown>>(onglet, {
-              type: "executer",
-              id: nouvelId(),
-              payload: { tache, vinted_user_id: compte.vinted_user_id },
-            });
+          : tache.type === "photos_reference"
+            ? await this.photosReference(backend, tache)
+            : await env.envoyer<Record<string, unknown>>(onglet, {
+                type: "executer",
+                id: nouvelId(),
+                payload: { tache, vinted_user_id: compte.vinted_user_id },
+              });
       const libelle = LIBELLES[tache.type] ?? tache.type;
       if (r.ok) {
         await backend.resultatTache(tache.id, { ok: true, resultat: r.resultat });
@@ -175,6 +179,7 @@ export class Moteur {
           erreur: r.erreur,
           arret: r.arret,
           erreur_vinted: r.erreur_vinted ?? false,
+          ...(r.resultat ? { resultat: r.resultat } : {}),
         });
         await this.action(`${libelle} : ${r.erreur}`);
       }
@@ -226,6 +231,23 @@ export class Moteur {
       });
     } finally {
       await this.env.ongletTravail.naviguer(`https://www.vinted.fr/member/${compte.vinted_user_id}`, () => true, 5_000);
+    }
+  }
+
+  /** Photos d'une annonce importée : téléchargées une fois (2 à 4 s d'écart), envoyées au backend. */
+  private async photosReference(backend: ClientBackend, tache: Tache): Promise<Reponse<Record<string, unknown>>> {
+    const urls = ((tache.payload.urls as unknown[]) ?? []).filter((u): u is string => typeof u === "string");
+    if (!urls.length || tache.article_id === null) return echec("Aucune photo à télécharger.");
+    try {
+      const images: Blob[] = [];
+      for (const [i, url] of urls.entries()) {
+        if (i > 0) await this.env.attendre(entre(2000, 4000, this.env.aleatoire));
+        images.push(await this.env.telecharger(url));
+      }
+      await backend.photosReference(tache.article_id, images);
+      return { ok: true, resultat: { photos: images.length } };
+    } catch (e) {
+      return echec((e as Error).message);
     }
   }
 

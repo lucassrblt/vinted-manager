@@ -111,6 +111,10 @@ class ArticleOut(BaseModel):
     prix_initial: Decimal | None = None
     prix_plancher: Decimal | None = None
     importe_vinted: bool = False
+    vinted_vues: int | None = None
+    vinted_favoris: int | None = None
+    derniere_publication_le: datetime | None = None
+    republications: int = 0
     created_at: datetime
     updated_at: datetime
     # Champs calculés

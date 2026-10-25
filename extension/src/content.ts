@@ -8,10 +8,8 @@ import { ClientVinted, lireContexte } from "./vinted/client";
 const contenu = new Contenu({
   // Contexte relu à chaque action : le jeton CSRF peut changer pendant la session.
   client: () => new ClientVinted((url, init) => window.fetch(url, init), lireContexte(document)),
-  demanderPhoto: (photoId) =>
-    chrome.runtime.sendMessage({ type: "photo", id: nouvelId(), payload: { photo_id: photoId } }) as Promise<
-      Reponse<PhotoBase64>
-    >,
+  demanderPhoto: (ref) =>
+    chrome.runtime.sendMessage({ type: "photo", id: nouvelId(), payload: ref }) as Promise<Reponse<PhotoBase64>>,
   attendre,
   maintenant: () => Date.now(),
   planifier: (fn, ms) => void setTimeout(fn, ms),

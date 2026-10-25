@@ -82,6 +82,9 @@ class Article(TimestampMixin, Base):
     vinted_vues: Mapped[int | None]
     vinted_favoris: Mapped[int | None]
     vinted_vu_le: Mapped[datetime | None]
+    # Republication : date de la dernière mise en ligne et nombre de republications.
+    derniere_publication_le: Mapped[datetime | None]
+    republications: Mapped[int] = mapped_column(default=0, server_default="0")
     updated_at: Mapped[datetime] = mapped_column(default=utcnow, onupdate=utcnow)
 
     batch: Mapped[Batch | None] = relationship(back_populates="articles")

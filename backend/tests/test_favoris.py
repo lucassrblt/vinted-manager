@@ -214,7 +214,10 @@ def test_resultat_relance(
     _, jeton = lucas
     evenement(client, jeton, {"notifications": [notif("n1", iso()), notif("n2", iso(), membre=43)]})
     resultats = {
-        MEMBRE: {"ok": True, "resultat": {"conversation_id": "conv-1", "transaction_id": 23562720554, "offer_id": 1}},
+        MEMBRE: {
+            "ok": True,
+            "resultat": {"conversation_id": "conv-1", "transaction_id": 23562720554, "offer_id": 1},
+        },
         43: {"ok": False, "erreur": "Conversation non ouverte après 15 s.", "erreur_vinted": False},
     }
     for i in range(2):  # l'ordre dépend des délais tirés au hasard

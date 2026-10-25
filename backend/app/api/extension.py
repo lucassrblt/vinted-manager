@@ -6,16 +6,28 @@ L'extension n'a que le minimum : elle exécute ce que le backend lui donne et re
 from datetime import datetime
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Response
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Response, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from app.api.deps import Db, get_parametres
+from app.config import get_settings
 from app.models import Article, CompteVinted, PhotoArticle, TacheVinted
-from app.services import alertes, brouillons, extension, file_vinted, horaires, reglages
+from app.services import (
+    alertes,
+    brouillons,
+    extension,
+    file_vinted,
+    horaires,
+    images,
+    photos,
+    reglages,
+    storage,
+)
 from app.services import assistant as _assistant  # noqa: F401  (enregistre ses événements et résultats)
 from app.services import dressing as _dressing  # noqa: F401  (enregistre l'événement « dressing »)
 from app.services import favoris as _favoris  # noqa: F401  (événement « notifications », relances)
+from app.services import republication as _republication  # noqa: F401  (contrôle et résultat des republications)
 
 router = APIRouter(prefix="/extension", tags=["extension"])
 
@@ -245,3 +257,61 @@ def resultat_brouillon(article_id: int, data: ResultatBrouillonIn, compte: Compt
         tache,
         ResultatTacheIn(ok=data.ok, resultat=resultat, erreur=data.erreur, arret=data.arret),
     )
+
+
+@router.get("/taches/{tache_id}/photos/{index}")
+def photo_tache(tache_id: int, index: int, compte: Compte, db: Db) -> Response:
+    """Photo transformée d'une republication (préparée par le backend avec Pillow)."""
+    tache = db.get(TacheVinted, tache_id)
+    if tache is None or tache.compte_id != compte.id:
+        raise HTTPException(404, "Tâche introuvable pour ce compte.")
+    liste = tache.payload.get("photos") or []
+    if not 0 <= index < len(liste):
+        raise HTTPException(404, "Photo introuvable.")
+    chemin = storage.chemin_absolu(str(liste[index]["fichier"]))
+    if not chemin.exists():
+        raise HTTPException(404, "Fichier introuvable sur le serveur.")
+    return Response(chemin.read_bytes(), media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+
+
+@router.post("/articles/{article_id}/photos-reference", status_code=201)
+async def photos_reference(
+    article_id: int, compte: Compte, db: Db, fichiers: list[UploadFile] = File(...)
+) -> dict[str, int]:
+    """Photos d'une annonce importée de Vinted, téléchargées une fois et gardées comme référence."""
+    article = _article_du_compte(db, compte, article_id)
+    if photos.photos_ordonnees(db, article.id):
+        raise HTTPException(409, "Cet article a déjà ses photos.")
+    max_octets = get_settings().max_upload_mb * 1024 * 1024
+    n = 0
+    for i, f in enumerate(fichiers[:20]):
+        contenu = await f.read(max_octets + 1)
+        if len(contenu) > max_octets:
+            raise HTTPException(413, "Photo trop lourde.")
+        try:
+            jpeg = images.preparer(contenu)
+        except images.ImageInvalide as exc:
+            raise HTTPException(415, str(exc)) from exc
+        type_photo = "devant" if i == 0 else "detail"
+        db.add(
+            PhotoArticle(
+                article_id=article.id,
+                type=type_photo,
+                ordre=i,
+                fichier_original=storage.ecrire_fichier(
+                    f"photos/article-{article.id}", f"vinted-{i:02d}.jpg", jpeg
+                ),
+                statut="original",
+                version_choisie="original",
+            )
+        )
+        n += 1
+    alertes.journaliser(
+        db,
+        compte,
+        "republication",
+        f"{n} photo(s) de référence enregistrée(s) pour {article.nom}.",
+        article_id=article.id,
+    )
+    db.commit()
+    return {"photos": n}

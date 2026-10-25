@@ -500,3 +500,49 @@ déployé. `main` n'a pas été touchée ; la branche vit dans un worktree sépa
    notifications lue via api » ou « via www »).
 3. Si l'alerte « Favoris non exploitables » arrive : capturer la liste des notifications (DevTools → Réseau →
    `notifications?page`) et me l'envoyer pour ajuster l'extraction.
+
+## Phase 5 : republication différenciée ✅
+
+### Fait
+- **Planification** (`services/republication.py`, toutes les 30 min, heures actives) : article en ligne depuis
+  5 jours (réglable) depuis la dernière publication ; au plus une republication programmée à la fois par compte,
+  0 à 20 min plus tard (jamais en rafale, budget de 40 par jour). Reportée si un message a été échangé sur l'article
+  il y a moins d'une heure (contrôle refait au moment de partir : report de 30 min). Une offre en attente ne bloque
+  pas.
+- **Avant la suppression** : une offre (relance) part aux membres de l'historique des favoris qui n'en ont pas reçu ;
+  la republication attend que ces relances soient faites.
+- **Photos** (Pillow, côté backend) : toujours à partir des photos publiées la première fois ; rotation de 1,5 à 2,5°
+  (sens alterné d'une republication à l'autre), zoom de 4,5 à 5,5 % (relevé si besoin pour qu'aucun coin vide ne
+  reste), luminosité −2 à −5 %, JPEG qualité 85 à 92 sans métadonnées. La première photo garde une couleur
+  imperceptiblement différente (ΔE ≤ 3, sinon baisse de luminosité réduite).
+- **Annonce importée sans photo** : tâche `photos_reference` — l'extension télécharge une fois les photos de
+  l'annonce (CDN `*.vinted.net`, sans cookie) et le backend les garde comme référence.
+- **Texte** : nouveau prompt `prompts/reecriture_annonce.txt` ; marque, taille, état, défauts, matière et mots-clés
+  vérifiés automatiquement ; deux essais, sinon l'annonce actuelle est reprise telle quelle.
+- **Extension** : contrôle de l'ancienne annonce (`GET /api/v2/items/{id}` : vendue, réservée ou fermée → annulé),
+  nouveau brouillon avec les photos transformées, publication (`completion`, `push_up: false`), puis suppression de
+  l'ancienne, dans cet ordre. Échec après une étape faite : le résultat partiel remonte (brouillon créé, ou nouvelle
+  annonce publiée mais ancienne non supprimée → alerte « supprime-la à la main »).
+- **App** : vues, favoris et nombre de republications sur la fiche article ; plages de transformation réglables.
+
+### Tests
+- Backend : 13 nouveaux tests (`tests/test_republication.py`) : zoom nécessaire, plages tirées, coins sans vide,
+  absence de métadonnées, fidélité de la première photo sur trois teintes, vérification du texte, repli sur l'annonce
+  actuelle, cadence, nuit, report pour conversation récente (à la planification et au départ), offres aux favoris
+  d'abord, annonce importée (téléchargement des photos), réussite, ancienne non supprimée, échec. 281 au total.
+- Extension : 71 tests (ordre brouillon → publication → suppression, corps de publication conforme à la capture,
+  annonce réservée, publication refusée, suppression refusée, photos de référence).
+
+### Décisions prises (phase 5)
+- **Republication d'une annonce importée** : `ai_photo = true` faute de savoir si ses photos étaient générées (on ne
+  déclare jamais `false` sans le savoir) ; description inconnue → pas de republication (journal) tant que la fiche
+  n'est pas complétée.
+- **Réécriture refusée deux fois** : on republie avec le texte actuel plutôt que de bloquer.
+- **Brouillon orphelin** (publication refusée) : laissé sur Vinted et signalé, jamais supprimé automatiquement.
+- Le sens de rotation alterne d'une republication à l'autre ; les paramètres tirés sont gardés dans la tâche.
+
+### À tester toi-même (phase 5, compte secondaire)
+1. Réduire la cadence à 1 jour (Paramètres → Automatisation → Réglages → Republication) sur le compte de test,
+   attendre la republication : nouvelle annonce publiée, ancienne supprimée, photos légèrement différentes.
+2. **Point de vigilance de la spécification** : comparer vues et favoris (fiche article → bloc Vinted) avant et après
+   quelques republications pour mesurer l'efficacité des transformations.

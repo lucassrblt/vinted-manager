@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "Exécute sur Vinted les actions décidées par vinted-manager (brouillons, réponses, offres).",
   "permissions": ["storage", "alarms", "tabs", "scripting"],
-  "host_permissions": ["https://www.vinted.fr/*", "http://localhost:8000/*"],
+  "host_permissions": ["https://www.vinted.fr/*", "https://*.vinted.net/*", "http://localhost:8000/*"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
   "background": { "service_worker": "background.js" },
   "content_scripts": [{ "matches": ["https://www.vinted.fr/*"], "js": ["content.js"], "run_at": "document_idle" }],

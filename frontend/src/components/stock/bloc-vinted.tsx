@@ -83,6 +83,22 @@ export function BlocVinted({ article: a }: { article: Article }) {
           </dd>
         </>
       )}
+      {(a.vinted_vues !== null || a.vinted_favoris !== null) && (
+        <>
+          <dt className="text-muted-foreground">Audience</dt>
+          <dd className="tabular-nums">
+            {a.vinted_vues ?? 0} vue(s) · {a.vinted_favoris ?? 0} favori(s)
+          </dd>
+        </>
+      )}
+      {a.republications > 0 && (
+        <>
+          <dt className="text-muted-foreground">Republiée</dt>
+          <dd>
+            {a.republications} fois, dernière le {formatDateHeure(a.derniere_publication_le)}
+          </dd>
+        </>
+      )}
       {a.prix_initial && (
         <>
           <dt className="text-muted-foreground">Prix initial</dt>

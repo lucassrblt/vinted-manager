@@ -63,6 +63,12 @@ export class FauxVinted {
     this.sur("POST", /\/item_upload\/drafts\/\d+\/completion$/, () => r("drafts_completion"));
     this.sur("PUT", /\/item_upload\/items\/\d+$/, () => r("items_update"));
     this.sur("POST", /\/api\/v2\/items\/\d+\/delete$/, () => r("items_delete"));
+    // Synthétique (pas de capture de GET /api/v2/items/{id}) : seuls les champs d'état sont lus ici.
+    this.sur("GET", /\/api\/v2\/items\/\d+\?localization=fr-FR$/, (url) => ({
+      body: {
+        item: { id: Number(/items\/(\d+)/.exec(url)?.[1]), is_closed: false, is_reserved: false, is_draft: false },
+      },
+    }));
     this.sur("GET", /\/api\/v2\/wardrobe\/\d+\/items\?page=\d+&per_page=\d+$/, () => r("wardrobe_items"));
     this.sur("GET", /\/offers\/seller_options$/, () => r("offers_seller_options"));
     this.sur("POST", /\/api\/v2\/transactions\/\d+\/offers$/, () => r("offers_counter"));

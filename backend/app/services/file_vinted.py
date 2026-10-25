@@ -6,6 +6,7 @@ budget d'actions. Faute de tâche, un brouillon peut être lancé.
 """
 
 from collections.abc import Callable
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import func, select
@@ -17,8 +18,19 @@ from app.services import alertes, brouillons, horaires, reglages, taches
 Rappel = Callable[[Session, CompteVinted, TacheVinted, bool], None]
 # Traitement du résultat selon le type de tâche (complété par les modules des phases suivantes).
 APRES: dict[str, Rappel] = {}
+# Contrôle juste avant de confier une tâche à l'extension : renvoie une date de report, ou None.
+Controle = Callable[[Session, CompteVinted, TacheVinted], datetime | None]
+AVANT: dict[str, Controle] = {}
 # Événements remontés par l'extension : type → traitement, qui renvoie la réponse à l'extension.
 EVENEMENTS: dict[str, Callable[[Session, CompteVinted, dict[str, Any]], dict[str, Any]]] = {}
+
+
+def avant(type_tache: str) -> Callable[[Controle], Controle]:
+    def enregistrer(f: Controle) -> Controle:
+        AVANT[type_tache] = f
+        return f
+
+    return enregistrer
 
 
 def apres(type_tache: str) -> Callable[[Rappel], Rappel]:
@@ -114,6 +126,14 @@ def _suivante(
             continue
         if not reponse and derniere is not None and maintenant - derniere < taches.ecart_requis(t):
             continue  # pas deux actions à la suite : on laisse passer quelques dizaines de secondes
+        controle = AVANT.get(t.type)
+        if controle is not None:
+            report = controle(db, compte, t)
+            if t.statut != "a_faire":
+                continue  # annulée par le contrôle
+            if report is not None:
+                t.executer_apres = report
+                continue
         return demarrer(t)
     if types is not None and "brouillon" not in types:
         return None

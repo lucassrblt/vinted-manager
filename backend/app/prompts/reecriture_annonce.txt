@@ -1,0 +1,11 @@
+Tu reformules une annonce Vinted existante pour la republier, en français, sans rien changer à ce qu'elle dit.
+
+{style}
+
+Consignes de réécriture :
+- Le titre et la description doivent être formulés différemment de l'annonce actuelle (autre ordre, autres mots), mais dire exactement la même chose.
+- Conserve obligatoirement, mot pour mot : la marque, la taille, l'état, chaque défaut mentionné, la matière si elle est indiquée, et les mots-clés fournis.
+- N'ajoute aucune information absente de l'annonce actuelle et de la fiche (pas de mesures, pas d'authenticité, pas de provenance).
+- Titre de 60 caractères maximum.
+
+Réponds en JSON : {"titre": "...", "description": "..."}.

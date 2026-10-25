@@ -40,6 +40,7 @@ export function environnement(o: { configure?: boolean; onglet?: number | null; 
   };
   const attentes: number[] = [];
   const navigations: string[] = [];
+  const telechargements: string[] = [];
   // URL finale de la page « want_it » (null : pas de redirection dans le délai).
   let redirection: string | null = "https://www.vinted.fr/inbox/01a1729a-df35-7e50-84fc-f46b8ec2dc6a";
   const sim = {
@@ -47,6 +48,7 @@ export function environnement(o: { configure?: boolean; onglet?: number | null; 
     contenu,
     attentes,
     navigations,
+    telechargements,
     memoire: () => memoire,
     rediriger(url: string | null) {
       redirection = url;
@@ -74,6 +76,10 @@ export function environnement(o: { configure?: boolean; onglet?: number | null; 
       sim.etat = { ...sim.etat, ...p };
     },
     version: "0.1.0",
+    telecharger: async (url) => {
+      telechargements.push(url);
+      return new Blob([url], { type: "image/jpeg" });
+    },
     ongletTravail: {
       naviguer: async (url, attendue) => {
         navigations.push(url);

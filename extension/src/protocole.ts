@@ -39,7 +39,10 @@ export interface Compteurs {
 }
 
 // Content script → service worker
-export type VersFond = MessageBase<"photo", { photo_id: number }> | MessageBase<"compteurs", Compteurs>;
+/** Photo d'un brouillon (`photo_id`) ou photo transformée d'une republication (`tache_id`, `index`). */
+export type RefPhoto = { photo_id: number } | { tache_id: number; index: number };
+
+export type VersFond = MessageBase<"photo", RefPhoto> | MessageBase<"compteurs", Compteurs>;
 
 export interface Echec {
   ok: false;
@@ -49,6 +52,8 @@ export interface Echec {
   mauvais_compte: boolean;
   /** Refus renvoyé par Vinted (et non un contrôle de l'extension) : compte pour les erreurs consécutives. */
   erreur_vinted?: boolean;
+  /** Ce qui a quand même été fait sur Vinted avant l'échec (ex. nouvelle annonce publiée). */
+  resultat?: Record<string, unknown>;
 }
 
 export type Reponse<R = unknown> = { ok: true; resultat: R } | Echec;

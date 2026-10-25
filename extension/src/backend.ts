@@ -131,4 +131,25 @@ export class ClientBackend {
   async photo(photoId: number): Promise<ArrayBuffer> {
     return (await this.requete("GET", `/photos/${photoId}`)).arrayBuffer();
   }
+
+  async photoTache(tacheId: number, index: number): Promise<ArrayBuffer> {
+    return (await this.requete("GET", `/taches/${tacheId}/photos/${index}`)).arrayBuffer();
+  }
+
+  /** Photos d'une annonce importée, téléchargées depuis Vinted, gardées comme référence. */
+  async photosReference(articleId: number, images: Blob[]): Promise<void> {
+    const formulaire = new FormData();
+    images.forEach((image, i) => formulaire.append("fichiers", image, `vinted-${i}.jpg`));
+    let res: Response;
+    try {
+      res = await this.fetch(`${this.url.replace(/\/+$/, "")}/api/extension/articles/${articleId}/photos-reference`, {
+        method: "POST",
+        headers: { "X-Extension-Token": this.jeton },
+        body: formulaire,
+      });
+    } catch {
+      throw new ErreurBackend("vinted-manager injoignable : le backend est-il lancé ?", 0);
+    }
+    if (!res.ok) throw new ErreurBackend(`Photos de référence refusées (${res.status}).`, res.status);
+  }
 }

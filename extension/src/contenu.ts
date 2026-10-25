@@ -2,13 +2,14 @@
  * Traitement des demandes du service worker dans l'onglet Vinted (testable sans Chrome).
  */
 import { type Attendre, base64VersBlob, entre } from "./outils";
-import type { Compteurs, Echec, PhotoBase64, Reponse, ResultatCompte, Tache, VersContenu } from "./protocole";
+import type { Compteurs, Echec, PhotoBase64, RefPhoto, Reponse, ResultatCompte, Tache, VersContenu } from "./protocole";
 import { type ChargeBrouillon, creerBrouillon } from "./vinted/brouillon";
 import type { ClientVinted } from "./vinted/client";
 import { verifierCompte } from "./vinted/compte";
 import { lireDressing } from "./vinted/dressing";
 import { lireNotifications, relancer } from "./vinted/favoris";
 import { ErreurAction, ErreurVinted } from "./vinted/erreurs";
+import { type ChargeRepublication, ErreurPartielle, republier } from "./vinted/republication";
 import {
   accepterOffre,
   contreOffre,
@@ -21,8 +22,9 @@ import {
 export interface Execution {
   client: ClientVinted;
   vintedUserId: number | null;
-  photo: (photoId: number) => Promise<Blob>;
+  photo: (ref: RefPhoto) => Promise<Blob>;
   attendre: Attendre;
+  aleatoire?: () => number;
 }
 
 export type Executeur = (tache: Tache, e: Execution) => Promise<Record<string, unknown>>;
@@ -33,10 +35,18 @@ export const EXECUTEURS: Record<string, Executeur> = {
   accepter_offre: (t, e) => accepterOffre(t.payload, e),
   refuser_offre: (t, e) => refuserOffre(t.payload, e),
   contre_offre: (t, e) => contreOffre(t.payload, e),
+  republication: (t, e) =>
+    republier(t.payload as unknown as ChargeRepublication, {
+      client: e.client,
+      vintedUserId: e.vintedUserId,
+      photo: (index) => e.photo({ tache_id: t.id, index }),
+      attendre: e.attendre,
+      aleatoire: e.aleatoire,
+    }),
   brouillon: async (tache, e) => ({
     ...(await creerBrouillon(tache.payload as unknown as ChargeBrouillon, {
       client: e.client,
-      photo: e.photo,
+      photo: (photo_id) => e.photo({ photo_id }),
       attendre: e.attendre,
       vintedUserId: e.vintedUserId,
     })),
@@ -52,7 +62,7 @@ export const VALIDITE_SURVEILLANCE_MS = 2 * 60_000;
 
 export interface DependancesContenu {
   client: () => ClientVinted;
-  demanderPhoto: (photoId: number) => Promise<Reponse<PhotoBase64>>;
+  demanderPhoto: (ref: RefPhoto) => Promise<Reponse<PhotoBase64>>;
   attendre: Attendre;
   maintenant: () => number;
   /** Relance différée de la surveillance (setTimeout dans la page). */
@@ -63,6 +73,9 @@ export interface DependancesContenu {
 }
 
 export function versReponse(e: unknown): Echec {
+  if (e instanceof ErreurPartielle) {
+    return { ...versReponse(e.cause), erreur: e.message, resultat: e.partiel };
+  }
   if (e instanceof ErreurVinted) {
     return { ok: false, erreur: e.message, arret: e.arret, mauvais_compte: false, erreur_vinted: true };
   }
@@ -158,8 +171,9 @@ export class Contenu {
           const resultat = await executeur(tache, {
             client: this.d.client(),
             vintedUserId: vinted_user_id,
-            photo: (id) => this.photo(id),
+            photo: (ref) => this.photo(ref),
             attendre: this.d.attendre,
+            aleatoire: this.d.aleatoire,
           });
           return { ok: true, resultat };
         }
@@ -181,9 +195,9 @@ export class Contenu {
     return valeur;
   }
 
-  private async photo(photoId: number): Promise<Blob> {
-    const r = await this.d.demanderPhoto(photoId);
-    if (!r.ok) throw new ErreurAction(`Photo ${photoId} indisponible : ${r.erreur}`);
+  private async photo(ref: RefPhoto): Promise<Blob> {
+    const r = await this.d.demanderPhoto(ref);
+    if (!r.ok) throw new ErreurAction(`Photo ${JSON.stringify(ref)} indisponible : ${r.erreur}`);
     return base64VersBlob(r.resultat.base64);
   }
 }

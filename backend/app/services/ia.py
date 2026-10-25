@@ -216,6 +216,48 @@ def _annonce_factice(fiche: dict[str, Any]) -> AnnonceIA:
     return AnnonceIA(titre=titre, description=description, mots_cles=mots)
 
 
+# --- Réécriture pour la republication ----------------------------------------------------------
+
+
+class Reecriture(BaseModel):
+    titre: str
+    description: str
+
+
+SCHEMA_REECRITURE = {
+    "type": "object",
+    "properties": {
+        "titre": {"type": "string", "description": "60 caractères maximum"},
+        "description": {"type": "string"},
+    },
+    "required": ["titre", "description"],
+    "additionalProperties": False,
+}
+
+
+def reecrire_annonce(
+    titre: str, description: str, fiche: dict[str, Any], mots_cles: list[str], essai: int = 0
+) -> Reecriture:
+    """Titre et description reformulés pour une republication (la vérification est faite par l'appelant)."""
+    if get_settings().ia_factice:
+        return Reecriture(titre=couper_titre(titre), description=description)
+    contenu = f"Annonce actuelle :\nTitre : {titre}\nDescription :\n{description}\n\n"
+    contenu += "Fiche de l'article :\n" + _fiche_texte(fiche)
+    if mots_cles:
+        contenu += "\n\nMots-clés à conserver : " + ", ".join(mots_cles)
+    if essai:
+        contenu += f"\n\nEssai n°{essai + 1} : la précédente réécriture oubliait une information obligatoire."
+    try:
+        r = Reecriture.model_validate(
+            _appeler(prompt_systeme("reecriture_annonce"), contenu, SCHEMA_REECRITURE)
+        )
+    except ValidationError as exc:
+        raise ErreurIA("Réponse de l'IA incomplète.") from exc
+    r.titre = couper_titre(r.titre)
+    r.description = r.description.strip()
+    return r
+
+
 # --- Analyse des photos -----------------------------------------------------------------------
 
 TYPES_PHOTO = ["devant", "dos", "etiquette", "logo", "detail", "defaut"]
