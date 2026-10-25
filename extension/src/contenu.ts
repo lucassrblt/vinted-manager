@@ -5,7 +5,9 @@ import { type Attendre, base64VersBlob, entre } from "./outils";
 import type { Compteurs, Echec, PhotoBase64, Reponse, ResultatCompte, Tache, VersContenu } from "./protocole";
 import { type ChargeBrouillon, creerBrouillon } from "./vinted/brouillon";
 import type { ClientVinted } from "./vinted/client";
+import { verifierCompte } from "./vinted/compte";
 import { lireDressing } from "./vinted/dressing";
+import { lireNotifications, relancer } from "./vinted/favoris";
 import { ErreurAction, ErreurVinted } from "./vinted/erreurs";
 import {
   accepterOffre,
@@ -128,6 +130,21 @@ export class Contenu {
             ok: true,
             resultat: reduireConversation(await this.d.client().conversation(message.payload.id)),
           };
+        case "notifications":
+          return { ok: true, resultat: await lireNotifications(this.d.client(), message.payload.source) };
+        case "verifier_compte":
+          this.compte = null; // relu sans cache : la navigation qui suit crée une conversation
+          return { ok: true, resultat: await verifierCompte(this.d.client(), message.payload.vinted_user_id) };
+        case "relance": {
+          const { vinted_user_id, ...relance } = message.payload;
+          const resultat = await relancer(relance, {
+            client: this.d.client(),
+            vintedUserId: vinted_user_id,
+            attendre: this.d.attendre,
+            aleatoire: this.d.aleatoire,
+          });
+          return { ok: true, resultat };
+        }
         case "surveillance":
           this.surveillance = { ...message.payload, jusqua: this.d.maintenant() + VALIDITE_SURVEILLANCE_MS };
           this.lancerBoucle();

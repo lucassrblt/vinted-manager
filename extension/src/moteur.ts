@@ -8,7 +8,8 @@
 import type { ClientBackend, CompteBackend } from "./backend";
 import type { Etat } from "./etat";
 import { type Attendre, entre } from "./outils";
-import { type Compteurs, nouvelId, type Reponse, type ResultatCompte, type VersContenu } from "./protocole";
+import { type Compteurs, nouvelId, type Reponse, type ResultatCompte, type Tache, type VersContenu } from "./protocole";
+import { conversationDepuisUrl, urlBloquante } from "./vinted/favoris";
 
 export const PERIODE_HEARTBEAT_MS = 60_000;
 // Au-delà, une action « en cours » est considérée comme perdue (service worker redémarré).
@@ -18,12 +19,19 @@ export const PERIODE_DRESSING_MS = 30 * 60_000;
 export const PERIODE_INBOX_MS = 5 * 60_000;
 export const CONVERSATIONS_MAX = 5;
 
+export const PERIODE_NOTIFICATIONS_MS = 5 * 60_000;
+// La page « want_it » doit rediriger vers la conversation dans ce délai.
+export const DELAI_WANT_IT_MS = 15_000;
+
 export interface Memoire {
   dernierHeartbeat: number;
   occupeDepuis: number | null;
   dernierDressing: number;
   derniereInbox: number;
   inboxDemandee: boolean;
+  dernieresNotifications: number;
+  notificationsDemandees: boolean;
+  sourceNotifications: "api" | "www" | null;
 }
 
 export const MEMOIRE_INITIALE: Memoire = {
@@ -32,7 +40,16 @@ export const MEMOIRE_INITIALE: Memoire = {
   dernierDressing: 0,
   derniereInbox: 0,
   inboxDemandee: false,
+  dernieresNotifications: 0,
+  notificationsDemandees: false,
+  sourceNotifications: null,
 };
+
+/** Onglet de travail ouvert par l'extension, en arrière-plan (pages qui demandent une navigation). */
+export interface OngletTravail {
+  /** Navigue et attend une URL qui satisfait `attendue` ; renvoie l'URL finale, ou null après `delaiMs`. */
+  naviguer(url: string, attendue: (url: string) => boolean, delaiMs: number): Promise<string | null>;
+}
 
 export interface Environnement {
   backend: ClientBackend | null;
@@ -44,6 +61,7 @@ export interface Environnement {
   lireMemoire(): Promise<Memoire>;
   ecrireMemoire(m: Memoire): Promise<void>;
   majEtat(partiel: Partial<Etat>): Promise<void>;
+  ongletTravail: OngletTravail;
   version: string;
 }
 
@@ -119,16 +137,34 @@ export class Moteur {
       memoire.derniereInbox = env.maintenant();
       if (!(await this.lireMessagerie(backend, onglet, compte))) return;
     }
+    if (
+      compte.modules.favoris !== false &&
+      (memoire.notificationsDemandees || env.maintenant() - memoire.dernieresNotifications >= PERIODE_NOTIFICATIONS_MS)
+    ) {
+      memoire.notificationsDemandees = false;
+      memoire.dernieresNotifications = env.maintenant();
+      const r = await this.lecture<{ source: "api" | "www"; notifications: unknown[] }>(backend, compte, onglet, {
+        type: "notifications",
+        id: nouvelId(),
+        payload: { source: memoire.sourceNotifications },
+      });
+      if (!r) return;
+      memoire.sourceNotifications = r.source;
+      await backend.evenement("notifications", r as unknown as Record<string, unknown>);
+    }
     const tache = await backend.tacheSuivante();
     if (!tache) return;
     memoire.occupeDepuis = env.maintenant();
     await env.ecrireMemoire(memoire);
     try {
-      const r = await env.envoyer<Record<string, unknown>>(onglet, {
-        type: "executer",
-        id: nouvelId(),
-        payload: { tache, vinted_user_id: compte.vinted_user_id },
-      });
+      const r =
+        tache.type === "relance_favori"
+          ? await this.relanceFavori(onglet, tache, compte)
+          : await env.envoyer<Record<string, unknown>>(onglet, {
+              type: "executer",
+              id: nouvelId(),
+              payload: { tache, vinted_user_id: compte.vinted_user_id },
+            });
       const libelle = LIBELLES[tache.type] ?? tache.type;
       if (r.ok) {
         await backend.resultatTache(tache.id, { ok: true, resultat: r.resultat });
@@ -147,10 +183,57 @@ export class Moteur {
     }
   }
 
+  /**
+   * Relance d'un favori : contrôle du compte, page « want_it » dans l'onglet de travail (elle ouvre ou
+   * crée la conversation et redirige vers /inbox/{id}), message et offre depuis l'onglet principal,
+   * puis l'onglet de travail revient sur le dressing.
+   */
+  private async relanceFavori(
+    onglet: number,
+    tache: Tache,
+    compte: CompteBackend,
+  ): Promise<Reponse<Record<string, unknown>>> {
+    const p = tache.payload as { item_id: number; membre_id: number; texte: string; montant: string };
+    const controle = await this.env.envoyer(onglet, {
+      type: "verifier_compte",
+      id: nouvelId(),
+      payload: { vinted_user_id: compte.vinted_user_id },
+    });
+    if (!controle.ok) return controle;
+    const url = `https://www.vinted.fr/inbox/want_it?receiver_id=${p.membre_id}&item_id=${p.item_id}`;
+    const fin = await this.env.ongletTravail.naviguer(
+      url,
+      (u) => conversationDepuisUrl(u) !== null || urlBloquante(u),
+      DELAI_WANT_IT_MS,
+    );
+    try {
+      if (fin === null) {
+        return echec("Conversation non ouverte par la page want_it en 15 s : rien n'a été envoyé.");
+      }
+      if (urlBloquante(fin)) {
+        return echec(`Vinted a redirigé vers ${fin} (session expirée ou vérification) : arrêt.`, true);
+      }
+      const conversation = conversationDepuisUrl(fin) as string;
+      return await this.env.envoyer<Record<string, unknown>>(onglet, {
+        type: "relance",
+        id: nouvelId(),
+        payload: {
+          conversation_id: conversation,
+          texte: p.texte,
+          montant: p.montant,
+          vinted_user_id: compte.vinted_user_id,
+        },
+      });
+    } finally {
+      await this.env.ongletTravail.naviguer(`https://www.vinted.fr/member/${compte.vinted_user_id}`, () => true, 5_000);
+    }
+  }
+
   /** Compteurs de non-lus en hausse (ou erreur) signalés par l'onglet. */
   async compteurs(c: Compteurs): Promise<void> {
     const memoire = { ...MEMOIRE_INITIALE, ...(await this.env.lireMemoire()) };
     memoire.inboxDemandee = true;
+    memoire.notificationsDemandees = true;
     await this.env.ecrireMemoire(memoire);
     if (c.arret && c.erreur && this.env.backend) {
       const compte = await this.env.backend.compte();
@@ -237,6 +320,10 @@ export class Moteur {
   private async action(texte: string): Promise<void> {
     await this.env.majEtat({ derniere_action: { date: this.env.maintenant(), texte } });
   }
+}
+
+function echec(erreur: string, arret = false): Reponse<never> {
+  return { ok: false, erreur, arret, mauvais_compte: false, erreur_vinted: arret };
 }
 
 /** Erreur de l'onglet (content script absent, page en rechargement) : jamais d'arrêt du compte. */

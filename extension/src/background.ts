@@ -40,6 +40,38 @@ async function envoyer<R>(onglet: number, message: VersContenu): Promise<Reponse
   }
 }
 
+/** Onglet de travail : ouvert en arrière-plan par l'extension et réutilisé (jamais l'onglet de Lucas). */
+async function ongletDeTravail(url: string): Promise<number> {
+  const { ongletTravail } = (await chrome.storage.session.get("ongletTravail")) as { ongletTravail?: number };
+  if (ongletTravail !== undefined) {
+    try {
+      await chrome.tabs.update(ongletTravail, { url });
+      return ongletTravail;
+    } catch {
+      /* onglet fermé : on en ouvre un autre */
+    }
+  }
+  const onglet = await chrome.tabs.create({ url, active: false });
+  await chrome.storage.session.set({ ongletTravail: onglet.id });
+  return onglet.id as number;
+}
+
+async function naviguer(url: string, attendue: (url: string) => boolean, delaiMs: number): Promise<string | null> {
+  const id = await ongletDeTravail(url);
+  const fin = Date.now() + delaiMs;
+  while (Date.now() < fin) {
+    await attendre(500);
+    try {
+      const onglet = await chrome.tabs.get(id);
+      const actuelle = onglet.url ?? onglet.pendingUrl ?? "";
+      if (actuelle && actuelle !== url && attendue(actuelle)) return actuelle;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 let enCours: Promise<void> | null = null;
 
 async function moteur(): Promise<Moteur> {
@@ -54,6 +86,7 @@ async function moteur(): Promise<Moteur> {
       ((await chrome.storage.local.get("memoire")) as { memoire?: Memoire }).memoire ?? { ...MEMOIRE_INITIALE },
     ecrireMemoire: (memoire) => chrome.storage.local.set({ memoire }),
     majEtat,
+    ongletTravail: { naviguer },
     version: chrome.runtime.getManifest().version,
   });
 }

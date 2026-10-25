@@ -2,7 +2,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import JSON, BigInteger, ForeignKey, Numeric, String, Text
+from sqlalchemy import JSON, BigInteger, ForeignKey, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, TimestampMixin, utcnow
@@ -137,6 +137,9 @@ class CompteVinted(TimestampMixin, Base):
     onglet_ferme_depuis: Mapped[datetime | None]
     # Première lecture de la messagerie : rien d'antérieur n'est traité par l'assistant.
     inbox_initialise_le: Mapped[datetime | None]
+    # Notifications Vinted déjà vues (identifiants récents) ; None tant que la première lecture n'a pas eu lieu.
+    notifications_vues: Mapped[list[str] | None] = mapped_column(JSON)
+    notifications_format_alerte_le: Mapped[datetime | None]
     alerte_hors_ligne_le: Mapped[datetime | None]
     alerte_onglet_le: Mapped[datetime | None]
 
@@ -210,4 +213,29 @@ class ConversationVinted(Base):
     # Négociation : dernière contre-offre envoyée, et plancher déjà renvoyé une fois.
     dernier_propose: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     plancher_renvoye: Mapped[bool] = mapped_column(default=False, server_default="false")
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class FavoriVinted(Base):
+    """Un membre a mis une annonce en favori. Un seul message et une seule offre par membre et par article."""
+
+    __tablename__ = "favori_vinted"
+    __table_args__ = (
+        UniqueConstraint("compte_id", "vinted_item_id", "membre_id", name="uq_favori_membre_article"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    compte_id: Mapped[int] = mapped_column(ForeignKey("compte_vinted.id", ondelete="CASCADE"), index=True)
+    article_id: Mapped[int | None] = mapped_column(ForeignKey("article.id", ondelete="SET NULL"), index=True)
+    vinted_item_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    membre_id: Mapped[int] = mapped_column(BigInteger)
+    membre_login: Mapped[str | None] = mapped_column(String(120))
+    notification_id: Mapped[str | None] = mapped_column(String(80))
+    recu_le: Mapped[datetime]
+    # a_relancer | programme | relance | ignore | erreur
+    statut: Mapped[str] = mapped_column(String(20), default="a_relancer")
+    raison: Mapped[str | None] = mapped_column(Text)
+    offre_envoyee: Mapped[bool] = mapped_column(default=False, server_default="false")
+    montant_offre: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    tache_id: Mapped[int | None] = mapped_column(ForeignKey("tache_vinted.id", ondelete="SET NULL"))
     created_at: Mapped[datetime] = mapped_column(default=utcnow)

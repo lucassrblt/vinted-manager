@@ -15,6 +15,7 @@ from app.models import Article, CompteVinted, PhotoArticle, TacheVinted
 from app.services import alertes, brouillons, extension, file_vinted, horaires, reglages
 from app.services import assistant as _assistant  # noqa: F401  (enregistre ses événements et résultats)
 from app.services import dressing as _dressing  # noqa: F401  (enregistre l'événement « dressing »)
+from app.services import favoris as _favoris  # noqa: F401  (événement « notifications », relances)
 
 router = APIRouter(prefix="/extension", tags=["extension"])
 

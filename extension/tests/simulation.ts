@@ -13,6 +13,9 @@ export class ContenuSimule {
   dressing: Gestion = () => ({ ok: true, resultat: { items: [], complet: true, total: 0 } });
   inbox: Gestion = () => ({ ok: true, resultat: { conversations: [] } });
   conversation: Gestion = (p: never) => ({ ok: true, resultat: { id: (p as { id: string }).id, messages: [] } });
+  notifications: Gestion = () => ({ ok: true, resultat: { source: "api", notifications: [] } });
+  verifier_compte: Gestion = () => ({ ok: true, resultat: { id: 3201823662, login: "jeanmekloul" } });
+  relance: Gestion = () => ({ ok: true, resultat: { conversation_id: "c", transaction_id: "1", offre_envoyee: true } });
   messages: VersContenu[] = [];
 
   repondre(m: VersContenu): Reponse {
@@ -28,13 +31,26 @@ export function environnement(o: { configure?: boolean; onglet?: number | null; 
   const contenu = new ContenuSimule();
   let horloge = Date.UTC(2026, 9, 25, 12, 0, 0);
   // Par défaut, dressing et messagerie viennent d'être lus : les tests ciblent le reste.
-  let memoire: Memoire = { ...MEMOIRE_INITIALE, dernierDressing: horloge, derniereInbox: horloge, ...o.memoire };
+  let memoire: Memoire = {
+    ...MEMOIRE_INITIALE,
+    dernierDressing: horloge,
+    derniereInbox: horloge,
+    dernieresNotifications: horloge,
+    ...o.memoire,
+  };
   const attentes: number[] = [];
+  const navigations: string[] = [];
+  // URL finale de la page « want_it » (null : pas de redirection dans le délai).
+  let redirection: string | null = "https://www.vinted.fr/inbox/01a1729a-df35-7e50-84fc-f46b8ec2dc6a";
   const sim = {
     backend,
     contenu,
     attentes,
+    navigations,
     memoire: () => memoire,
+    rediriger(url: string | null) {
+      redirection = url;
+    },
     etat: { ...ETAT_INITIAL } as Etat,
     avancer(ms: number) {
       horloge += ms;
@@ -58,6 +74,13 @@ export function environnement(o: { configure?: boolean; onglet?: number | null; 
       sim.etat = { ...sim.etat, ...p };
     },
     version: "0.1.0",
+    ongletTravail: {
+      naviguer: async (url, attendue) => {
+        navigations.push(url);
+        if (!url.includes("want_it")) return url;
+        return redirection !== null && attendue(redirection) ? redirection : null;
+      },
+    },
   };
   sim.moteur = new Moteur(env);
   return sim;

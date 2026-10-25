@@ -24,6 +24,9 @@ export type VersContenu =
   | MessageBase<"inbox", null>
   | MessageBase<"conversation", { id: string }>
   | MessageBase<"dressing", { user_id: number | null }>
+  | MessageBase<"notifications", { source: "api" | "www" | null }>
+  | MessageBase<"verifier_compte", { vinted_user_id: number | null }>
+  | MessageBase<"relance", { conversation_id: string; texte: string; montant: string; vinted_user_id: number | null }>
   | MessageBase<"surveillance", { actif: boolean; nuit: boolean }>
   | MessageBase<"executer", { tache: Tache; vinted_user_id: number | null }>;
 

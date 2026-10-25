@@ -145,6 +145,7 @@ describe("surveillance de Vinted", () => {
       { type: "inbox", donnees: { conversations: [] } },
       { type: "conversation", donnees: { id: "c1", messages: [] } },
       { type: "conversation", donnees: { id: "c2", messages: [] } },
+      { type: "notifications", donnees: { source: "api", notifications: [] } },
     ]);
     expect(sim.attentes).toEqual([3000, 3000]); // 2 à 4 s entre deux lectures
     expect(sim.backend.chemins()).toContain("GET /taches/suivante");
@@ -186,5 +187,70 @@ describe("surveillance de Vinted", () => {
     await sim.moteur.compteurs({ messages: null, notifications: null, erreur: "Captcha Vinted détecté", arret: true });
     expect(sim.backend.chemins()).toEqual(["GET /compte", "POST /arret"]);
     expect(sim.memoire().inboxDemandee).toBe(true);
+  });
+});
+
+describe("favoris", () => {
+  const RELANCE = {
+    id: 51,
+    type: "relance_favori",
+    article_id: 3,
+    payload: { item_id: 10475120267, membre_id: 900000005, texte: "Hello !", montant: "6.5" },
+  };
+
+  it("notifications lues quand le compteur augmente, adresse qui répond mémorisée", async () => {
+    const sim = environnement();
+    sim.contenu.notifications = () => ({ ok: true, resultat: { source: "www", notifications: [{ id: "n1" }] } });
+    await sim.moteur.compteurs({ messages: 0, notifications: 1 });
+    await sim.moteur.tick();
+    expect(sim.contenu.messages.find((m) => m.type === "notifications")?.payload).toEqual({ source: null });
+    expect(sim.memoire().sourceNotifications).toBe("www");
+    await sim.moteur.compteurs({ messages: 0, notifications: 2 });
+    await sim.moteur.tick();
+    expect(sim.contenu.messages.filter((m) => m.type === "notifications").at(-1)?.payload).toEqual({ source: "www" });
+  });
+
+  it("relance : compte vérifié, page want_it dans l'onglet de travail, message et offre, retour au dressing", async () => {
+    const sim = environnement();
+    sim.backend.sur("GET /taches/suivante", () => ({ body: RELANCE }));
+    await sim.moteur.tick();
+    expect(sim.contenu.messages.map((m) => m.type).slice(-2)).toEqual(["verifier_compte", "relance"]);
+    expect(sim.navigations).toEqual([
+      "https://www.vinted.fr/inbox/want_it?receiver_id=900000005&item_id=10475120267",
+      "https://www.vinted.fr/member/3201823662",
+    ]);
+    expect(sim.contenu.messages.at(-1)?.payload).toEqual({
+      conversation_id: "01a1729a-df35-7e50-84fc-f46b8ec2dc6a",
+      texte: "Hello !",
+      montant: "6.5",
+      vinted_user_id: 3201823662,
+    });
+    expect(sim.backend.appels.at(-1)).toMatchObject({ chemin: "/taches/51/resultat", corps: { ok: true } });
+  });
+
+  it("mauvais compte connecté : aucune navigation", async () => {
+    const sim = environnement();
+    sim.backend.sur("GET /taches/suivante", () => ({ body: RELANCE }));
+    sim.contenu.verifier_compte = () => ({ ok: false, erreur: "Mauvais compte", arret: false, mauvais_compte: true });
+    await sim.moteur.tick();
+    expect(sim.navigations).toEqual([]);
+    expect(sim.backend.appels.at(-1)?.corps).toMatchObject({ ok: false, erreur: "Mauvais compte" });
+  });
+
+  it("pas de redirection en 15 s : erreur, rien n'est envoyé", async () => {
+    const sim = environnement();
+    sim.backend.sur("GET /taches/suivante", () => ({ body: RELANCE }));
+    sim.rediriger(null);
+    await sim.moteur.tick();
+    expect(sim.contenu.messages.map((m) => m.type)).not.toContain("relance");
+    expect(sim.backend.appels.at(-1)?.corps).toMatchObject({ ok: false, arret: false });
+  });
+
+  it("redirection vers la connexion : arrêt du compte", async () => {
+    const sim = environnement();
+    sim.backend.sur("GET /taches/suivante", () => ({ body: RELANCE }));
+    sim.rediriger("https://www.vinted.fr/member/signup/select_type?ref_url=%2Finbox");
+    await sim.moteur.tick();
+    expect(sim.backend.appels.at(-1)?.corps).toMatchObject({ ok: false, arret: true });
   });
 });

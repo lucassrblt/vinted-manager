@@ -455,3 +455,48 @@ déployé. `main` n'a pas été touchée ; la branche vit dans un worktree sépa
 2. Faire une offre à 50 % puis à 70 % du prix → refus poli, puis contre-offre ; vérifier les montants.
 3. Vérifier dans Paramètres → Automatisation → Journal que les annonces du dressing sont rattachées ou importées
    (et compléter le coût d'achat des articles importés).
+
+## Phase 4 : favoris (message et offre en moins d'une minute) ✅
+
+### Fait
+- **Détection** : quand le compteur de notifications augmente (relevé toutes les 15 à 30 s), et toutes les 5 min par
+  sécurité, l'extension lit la liste des notifications : `api.vinted.fr/inbox-notifications/v1/notifications`
+  d'abord, puis `www.vinted.fr/web/gateway/inbox-notifications/v1/notifications` ; celle qui répond est mémorisée
+  et journalisée. Un 404 n'arrête pas le compte (route absente, pas un blocage).
+- **Backend** (`services/favoris.py`, table `favori_vinted`) : un favori par membre et par annonce (contrainte
+  d'unicité), relance programmée 20 à 60 s après (réglable) ; la nuit, à partir de 8 h si le favori a moins de 12 h.
+  Offre = prix affiché − 10 % (réglable), arrondie aux 50 centimes, jamais sous le plancher ; pas de relance si aucune
+  réduction n'est possible. Message tiré au hasard parmi les variantes, avec `{prenom}` (pseudo, ou rien),
+  `{article}`, `{prix}` (montant de l'offre) ; message par défaut de la spécification.
+- **Extension** : contrôle du compte (sans cache), page `want_it` ouverte dans l'**onglet de travail** (en
+  arrière-plan, réutilisé), conversation lue dans l'URL `/inbox/{id}` (15 s au plus), `transaction_id` lu dans la
+  conversation (méthode simple de la spécification), message puis offre 2 à 5 s après (limites `seller_options`
+  vérifiées), retour de l'onglet de travail sur le dressing. Redirection vers une page de connexion ou de vérification
+  → arrêt du compte.
+- **Après la relance**, la conversation est enregistrée avec l'offre envoyée comme dernière proposition : si le membre
+  négocie, l'assistant repart de là.
+
+### Tests
+- Backend : 10 nouveaux tests (`tests/test_favoris.py`) : relance en moins d'une minute, unicité membre/article,
+  première lecture, notification ordinaire, format inexploitable signalé une fois par jour, nuit et limite de 12 h,
+  plancher, module coupé, article inconnu, variables du message, extraction, résultat (conversation enregistrée,
+  budget : un message et une offre par relance). 268 tests au total. Migration `f3d9b2c6e815` vérifiée.
+- Extension : 65 tests (bascule d'adresse des notifications, mémorisation, relance complète, mauvais compte sans
+  navigation, absence de redirection, redirection vers la connexion, offre refusée après le message).
+
+### Décisions prises (phase 4)
+- **Format des notifications non capturé** : extraction tolérante (texte contenant « favori », identifiant de
+  l'annonce dans le lien ou `subject_id`, membre dans le lien ou `sender_id`/`user_id`, jamais le compte lui-même).
+  Notification inexploitable : aucune relance, journal, et une alerte par jour au plus pour demander une capture.
+- **Première lecture des notifications** : rien d'antérieur n'est relancé.
+- **`{prix}`** = le montant de l'offre proposée.
+- Les relances de favoris ne partent jamais la nuit (pas une réponse à un acheteur).
+- La lecture des notifications ne se fait que si le module favoris est actif.
+
+### À tester toi-même (phase 4, compte secondaire)
+1. Depuis un autre compte, mettre un article en favori : dans la minute, une conversation s'ouvre avec le message et
+   une offre à −10 %. Vérifier que l'onglet de travail (en arrière-plan) revient ensuite sur le dressing.
+2. Dans Paramètres → Automatisation → Journal, noter quelle adresse de notifications a répondu (« Liste des
+   notifications lue via api » ou « via www »).
+3. Si l'alerte « Favoris non exploitables » arrive : capturer la liste des notifications (DevTools → Réseau →
+   `notifications?page`) et me l'envoyer pour ajuster l'extraction.

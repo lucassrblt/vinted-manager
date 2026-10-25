@@ -210,6 +210,8 @@ export class ClientVinted {
     if (res.status === 403) throw new ErreurVinted(`Vinted a refusé l'accès (403) sur ${chemin}.`, true, 403);
     if (res.status === 429)
       throw new ErreurVinted(`Trop de requêtes : Vinted limite le débit (429) sur ${chemin}.`, true, 429);
+    // Route absente : ce n'est pas un signe de blocage (ex. adresse des notifications à vérifier).
+    if (res.status === 404) throw new ErreurVinted(`Route Vinted introuvable (404) : ${chemin}.`, false, 404);
     const minuscule = texte.slice(0, 5000).toLowerCase();
     let donnees: unknown;
     try {
