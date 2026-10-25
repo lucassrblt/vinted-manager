@@ -8,7 +8,7 @@ mkdirSync("dist", { recursive: true });
 cpSync("static", "dist", { recursive: true });
 
 const options = {
-  entryPoints: ["src/background.ts", "src/content.ts", "src/popup.ts", "src/options.ts"],
+  entryPoints: ["src/background.ts", "src/content.ts", "src/pont.ts", "src/popup.ts", "src/options.ts"],
   bundle: true,
   outdir: "dist",
   format: "iife",

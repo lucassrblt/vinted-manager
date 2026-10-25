@@ -256,3 +256,14 @@ describe("favoris", () => {
     expect(sim.backend.appels.at(-1)?.corps).toMatchObject({ ok: false, arret: true });
   });
 });
+
+describe("compte Vinted pas encore confirmé", () => {
+  it("signal de vie seulement, aucune lecture ni action sur Vinted", async () => {
+    const sim = environnement({ memoire: { dernierDressing: 0, derniereInbox: 0 } });
+    sim.backend.compte.vinted_user_id = null;
+    await sim.moteur.tick();
+    expect(sim.contenu.messages.map((m) => m.type)).toEqual(["compte"]);
+    expect(sim.backend.chemins()).not.toContain("GET /taches/suivante");
+    expect(sim.etat.message).toContain("Confirme le compte Vinted");
+  });
+});

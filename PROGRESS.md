@@ -644,3 +644,14 @@ tous corrigés (migration `d2b6f9e0a571` vérifiée, 298 tests backend, 81 tests
 9. **Un seul message par membre** même après republication (contrôle aussi par article).
 10. **Republication impossible** (fiche incomplète) : reportée sans modifier la date de publication (qui aurait
     déclenché une baisse de prix tardive).
+
+## Premier lancement réel : 403 sur `users/current` (25/10/2026)
+
+- **Constat** : 403 de Vinted sur `GET /api/v2/users/current` dès la première connexion.
+- **Cause probable** : le content script tourne dans un monde isolé ; son `fetch` ne passe pas par les scripts de la
+  page (dont la protection anti-robot) qui accompagnent les requêtes du site.
+- **Correction (extension 0.2.0)** : un pont (`src/pont.ts`, `world: "MAIN"`) exécute les requêtes avec le
+  `window.fetch` de la page ; le content script lui délègue chaque appel (adresses de Vinted uniquement). Un 403 de la
+  protection anti-robot est désormais nommé comme tel dans l'erreur.
+- **Compte non confirmé** : plus aucune lecture de Vinted (dressing, messagerie) tant que l'identifiant attendu n'est
+  pas confirmé ; seul le signal de vie lit `users/current`.

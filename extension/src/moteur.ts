@@ -125,6 +125,13 @@ export class Moteur {
     compte ??= await backend.compte();
     await this.afficherCompte(compte);
     if (compte.pause || !compte.automatisation_active) return;
+    if (compte.vinted_user_id === null) {
+      await env.majEtat({
+        statut: "pause",
+        message: "Confirme le compte Vinted dans vinted-manager (Paramètres → Automatisation).",
+      });
+      return; // rien d'autre sur Vinted tant que le compte attendu n'est pas confirmé
+    }
     // L'onglet relève les compteurs de non-lus tant qu'il reçoit cette consigne (toutes les 30 s).
     await env.envoyer(onglet, {
       type: "surveillance",

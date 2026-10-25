@@ -115,3 +115,17 @@ describe("ClientVinted", () => {
     expect(lireContexte(meta as unknown as Document).csrf).toBe("meta-csrf");
   });
 });
+
+describe("403 de la protection anti-robot", () => {
+  it("identifié comme tel dans le message", async () => {
+    const faux = new FauxVinted().sur("GET", /users\/current/, () => ({
+      status: 403,
+      texte: '{"url":"https://geo.captcha-delivery.com/captcha/?initialCid=x"}',
+    }));
+    const err = (await new ClientVinted(faux.fetch, contexte)
+      .utilisateurCourant()
+      .catch((e: unknown) => e)) as ErreurVinted;
+    expect(err.message).toBe("Protection anti-robot de Vinted (403, captcha) sur /api/v2/users/current.");
+    expect(err.arret).toBe(true);
+  });
+});

@@ -207,7 +207,16 @@ export class ClientVinted {
     const texte = await res.text();
     if (res.status === 401)
       throw new ErreurVinted("Session Vinted expirée (401) : reconnecte-toi dans ce profil Chrome.", true, 401);
-    if (res.status === 403) throw new ErreurVinted(`Vinted a refusé l'accès (403) sur ${chemin}.`, true, 403);
+    if (res.status === 403) {
+      const antiRobot = /captcha|datadome/i.test(texte.slice(0, 5000));
+      throw new ErreurVinted(
+        antiRobot
+          ? `Protection anti-robot de Vinted (403, captcha) sur ${chemin}.`
+          : `Vinted a refusé l'accès (403) sur ${chemin}.`,
+        true,
+        403,
+      );
+    }
     if (res.status === 429)
       throw new ErreurVinted(`Trop de requêtes : Vinted limite le débit (429) sur ${chemin}.`, true, 429);
     // Route absente : ce n'est pas un signe de blocage (ex. adresse des notifications à vérifier).

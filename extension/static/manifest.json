@@ -1,13 +1,16 @@
 {
   "manifest_version": 3,
   "name": "vinted-manager",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Exécute sur Vinted les actions décidées par vinted-manager (brouillons, réponses, offres).",
   "permissions": ["storage", "alarms", "tabs", "scripting"],
   "host_permissions": ["https://www.vinted.fr/*", "https://*.vinted.net/*", "http://localhost:8000/*"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
   "background": { "service_worker": "background.js" },
-  "content_scripts": [{ "matches": ["https://www.vinted.fr/*"], "js": ["content.js"], "run_at": "document_idle" }],
+  "content_scripts": [
+    { "matches": ["https://www.vinted.fr/*"], "js": ["pont.js"], "run_at": "document_idle", "world": "MAIN" },
+    { "matches": ["https://www.vinted.fr/*"], "js": ["content.js"], "run_at": "document_idle" }
+  ],
   "action": { "default_popup": "popup.html", "default_title": "vinted-manager" },
   "options_page": "options.html"
 }
